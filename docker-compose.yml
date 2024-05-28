@@ -1,0 +1,40 @@
+
+services:
+  app:
+    image: django_online_reservation
+    container_name: app
+    build: .
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app/
+    environment:
+      - "DJANGO_DEBUG=${DOCKER_COMPOSE_DJANGO_DEBUG}"
+      - "DJANGO_ALLOWED_HOSTS=${DOCKER_COMPOSE_DJANGO_ALLOWED_HOSTS}"
+      - "DJANGO_SECRET_KEY=${DOCKER_COMPOSE_DJANGO_SECRET_KEY}"
+      - "POSTGRES_DB=${DOCKER_COMPOSE_POSTGRES_DB}"
+      - "POSTGRES_USER=${DOCKER_COMPOSE_POSTGRES_USER}"
+      - "POSTGRES_PASSWORD=${DOCKER_COMPOSE_POSTGRES_PASSWORD}"
+      - "POSTGRES_HOST=${DOCKER_COMPOSE_POSTGRES_HOST}"
+      - "POSTGRES_PORT=${DOCKER_COMPOSE_POSTGRES_PORT}"
+    depends_on:
+      - postgres
+  
+  postgres:
+    image: postgres:16.3-alpine
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - "POSTGRES_HOST_AUTH_METHOD=trust"
+      - "POSTGRES_DB=${DOCKER_COMPOSE_POSTGRES_DB}"
+      - "POSTGRES_USER=${DOCKER_COMPOSE_POSTGRES_USER}"
+      - "POSTGRES_PASSWORD=${DOCKER_COMPOSE_POSTGRES_PASSWORD}"
+      - "POSTGRES_HOST=${DOCKER_COMPOSE_POSTGRES_HOST}"
+      - "POSTGRES_PORT=${DOCKER_COMPOSE_POSTGRES_PORT}"
+
+volumes:
+  postgres_data:
