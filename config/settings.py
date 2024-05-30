@@ -41,6 +41,7 @@ INSTALLED_APPS = [
 
     # My apps
     'core',
+    'online_reservation',
 ]
 
 MIDDLEWARE = [
