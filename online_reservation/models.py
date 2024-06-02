@@ -108,7 +108,7 @@ class Doctor(Person):
     province = models.ForeignKey(Province, blank=True, null=True, on_delete=models.PROTECT, related_name='doctors', verbose_name=_('Province'))
     city = models.ForeignKey(City, blank=True, null=True, on_delete=models.PROTECT, related_name='doctors', verbose_name=_('City')) # TODO: validate for city that exist in province
 
-    confirm_datetime = models.DateTimeField(blank=True, null=True, verbose_name=_('Created datetime')) # TODO: when status is accepted, this field be filled
+    confirm_datetime = models.DateTimeField(blank=True, null=True, verbose_name=_('Confirm datetime')) # TODO: when status is accepted, this field be filled
 
     def __str__(self):
         return f'{self.full_name}(M.C.NO: {self.medical_council_number})'
@@ -177,7 +177,6 @@ class Comment(models.Model):
     body = models.TextField(verbose_name=_('Body'))
 
     created_datetime = models.DateTimeField(auto_now_add=True, verbose_name=_('Created datetime'))
-    modified_datetime = models.DateTimeField(auto_now=True, verbose_name=_('Modified datetime'))
 
     def __str__(self):
         return f'{self.body[:30]}'
@@ -188,8 +187,8 @@ class Comment(models.Model):
 
 
 class Reserve(models.Model):
-    RESERVE_STATUS_PAID = 'P'
-    RESERVE_STATUS_UNPAID = 'U'
+    RESERVE_STATUS_PAID = 'p'
+    RESERVE_STATUS_UNPAID = 'u'
 
     RESERVE_STATUS = [
         (RESERVE_STATUS_PAID, _('Paid')),
@@ -197,13 +196,13 @@ class Reserve(models.Model):
     ]
 
     doctor = models.ForeignKey(Doctor, on_delete=models.PROTECT, related_name='reserves', verbose_name=_('Doctor'))
-    patient = models.ForeignKey(Patient, on_delete=models.PROTECT, related_name='reserves', verbose_name=_('Patient')) # TODO: patient can cancel reserve for 20 minutes
+    patient = models.ForeignKey(Patient, blank=True, null=True, on_delete=models.PROTECT, related_name='reserves', verbose_name=_('Patient')) # TODO: patient can cancel reserve for 20 minutes
     status = models.CharField(max_length=1, choices=RESERVE_STATUS, default=RESERVE_STATUS_UNPAID, verbose_name=_('Status')) # TODO: after 20 minutes delete patient's reserve
     price = models.PositiveIntegerField(verbose_name=_('Price'))
     reserve_datetime = models.DateTimeField(verbose_name=_('Reserve datetime')) # TODO: in same day and time, doctor can't add more than one reserve && if reserve_datetime has passed delete it reserve
 
     def __str__(self):
-        return f'{self.patient}(Doctor: {self.doctor.first_name}): {self.reserve_datetime}'
+        return f'{self.patient}(Doctor: {self.doctor.first_name}): {self.reserve_datetime}' # TODO: if not exist patient, show proper str
 
     class Meta:
         verbose_name = _('Reserve')

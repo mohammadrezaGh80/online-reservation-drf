@@ -26,15 +26,14 @@ services:
     container_name: postgres
     ports:
       - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+    # volumes:
+    #   - postgres_data:/var/lib/postgresql/data
     environment:
-      - "POSTGRES_HOST_AUTH_METHOD=trust"
       - "POSTGRES_DB=${DOCKER_COMPOSE_POSTGRES_DB}"
       - "POSTGRES_USER=${DOCKER_COMPOSE_POSTGRES_USER}"
       - "POSTGRES_PASSWORD=${DOCKER_COMPOSE_POSTGRES_PASSWORD}"
       - "POSTGRES_HOST=${DOCKER_COMPOSE_POSTGRES_HOST}"
       - "POSTGRES_PORT=${DOCKER_COMPOSE_POSTGRES_PORT}"
 
-volumes:
-  postgres_data:
+# volumes:
+#   postgres_data:
