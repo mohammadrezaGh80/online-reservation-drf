@@ -59,7 +59,7 @@ class Person(models.Model):
     birth_date = models.DateField(blank=True, null=True, verbose_name=_('Birth date'))
     national_code = models.CharField(max_length=10, blank=True, unique=True, validators=[national_code_validator], verbose_name=_('National code'))
     email = models.EmailField(unique=True, null=True, blank=True, verbose_name=_('Email'))
-    gender = models.CharField(max_length=1, choices=PERSON_GENDER, default=PERSON_GENDER_NOT_DEFINED, verbose_name=_('Gender'))
+    gender = models.CharField(max_length=1, choices=PERSON_GENDER, blank=True, default=PERSON_GENDER_NOT_DEFINED, verbose_name=_('Gender'))
 
     @property
     def full_name(self):
@@ -72,7 +72,7 @@ class Person(models.Model):
 class Patient(Person):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='patient', verbose_name=_('User'))
     insurance = models.ForeignKey(Insurance, blank=True, null=True, on_delete=models.PROTECT, related_name='patients', verbose_name=_('Insurance'))
-    case_history = models.TextField(verbose_name=_('Case history'))
+    case_history = models.TextField(blank=True, verbose_name=_('Case history'))
     is_foreign_national = models.BooleanField(default=False, verbose_name=_('Is foreign national'))
     province = models.ForeignKey(Province, blank=True, null=True, on_delete=models.PROTECT, related_name='patients', verbose_name=_('Province'))
     city = models.ForeignKey(City, blank=True, null=True, on_delete=models.PROTECT, related_name='patients', verbose_name=_('City')) # TODO: validate for city that exist in province
@@ -80,7 +80,7 @@ class Patient(Person):
     created_datetime = models.DateTimeField(auto_now_add=True, verbose_name=_('Created datetime'))
 
     def __str__(self):
-        return self.full_name if self.full_name else 'Unknown'
+        return self.full_name if self.full_name else self.user.phone
 
     class Meta:
         verbose_name = _('Patient')
