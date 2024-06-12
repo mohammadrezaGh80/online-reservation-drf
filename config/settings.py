@@ -43,6 +43,8 @@ INSTALLED_APPS = [
 
     # Third-party apps
     'debug_toolbar',
+    'rest_framework',
+    'rest_framework_simplejwt',
 
     # My apps
     'core',
@@ -147,4 +149,11 @@ INTERNAL_IPS = [
 
 DEBUG_TOOLBAR_CONFIG = {
     'SHOW_TOOLBAR_CALLBACK' : show_toolbar,
+}
+
+# Rest framework config
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    )
 }
