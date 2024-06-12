@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 
-from .models import CustomUser
+from .models import OTP, CustomUser
 
 
 @admin.register(CustomUser)
@@ -25,4 +25,10 @@ class CustomUserAdmin(BaseUserAdmin):
     readonly_fields = ['is_staff', 'is_superuser']
     ordering = []
     filter_horizontal = []
+    list_per_page = 15
+
+
+@admin.register(OTP)
+class OTPAdmin(admin.ModelAdmin):
+    list_display = ['phone', 'password', 'created_datetime', 'expired_datetime']
     list_per_page = 15
