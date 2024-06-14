@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
+from django.db.models import Q
 
 from .validators import NationalCodeValidator, MedicalCouncilNumberValidator
 
@@ -57,8 +58,8 @@ class Person(models.Model):
     first_name = models.CharField(max_length=255, blank=True, verbose_name=_('First name'))
     last_name = models.CharField(max_length=255, blank=True, verbose_name=_('Last name'))
     birth_date = models.DateField(blank=True, null=True, verbose_name=_('Birth date'))
-    national_code = models.CharField(max_length=10, blank=True, unique=True, validators=[national_code_validator], verbose_name=_('National code'))
-    email = models.EmailField(unique=True, null=True, blank=True, verbose_name=_('Email'))
+    national_code = models.CharField(max_length=10, blank=True, validators=[national_code_validator], verbose_name=_('National code'))
+    email = models.EmailField(null=True, blank=True, verbose_name=_('Email'))
     gender = models.CharField(max_length=1, choices=PERSON_GENDER, blank=True, default=PERSON_GENDER_NOT_DEFINED, verbose_name=_('Gender'))
 
     @property
@@ -85,6 +86,20 @@ class Patient(Person):
     class Meta:
         verbose_name = _('Patient')
         verbose_name_plural = _('Patients')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['national_code'],
+                name='patient_unique_national_code',
+                condition=~Q(national_code=''),
+                violation_error_message=_('This national code has already been registered for a patient')
+            ),
+            models.UniqueConstraint(
+                fields=['email'],
+                name='patient_unique_email',
+                condition=~Q(email=''),
+                violation_error_message=_('This email has already been registered for a patient')
+            )
+        ]
     
 
 class Doctor(Person):
@@ -116,6 +131,20 @@ class Doctor(Person):
     class Meta:
         verbose_name = _('Doctor')
         verbose_name_plural = _('Doctors')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['national_code'],
+                name='doctor_unique_national_code',
+                condition=~Q(national_code=''),
+                violation_error_message=_('This national code has already been registered for a doctor')
+            ),
+            models.UniqueConstraint(
+                fields=['email'],
+                name='doctor_unique_email',
+                condition=~Q(email=''),
+                violation_error_message=_('This email has already been registered for a doctor')
+            )
+        ]
 
 
 class Specialty(models.Model):

@@ -30,7 +30,7 @@ class InsuranceAdmin(admin.ModelAdmin):
 
 @admin.register(models.Patient)
 class PatientAdmin(admin.ModelAdmin):
-    list_display = ['first_name', 'last_name', 'get_phone', 'gender', 'insurance', 'is_foreign_national', 'province', 'city']
+    list_display = ['get_phone', 'first_name', 'last_name', 'gender', 'insurance', 'is_foreign_national', 'province', 'city']
     list_per_page = 15
     list_select_related = ['insurance', 'province', 'city', 'user']
     search_fields = ['first_name', 'last_name', 'user__phone']
