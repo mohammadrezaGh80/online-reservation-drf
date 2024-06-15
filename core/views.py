@@ -5,10 +5,14 @@ from django.contrib.auth import get_user_model
 from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.viewsets import ModelViewSet
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.decorators import action
 
-from .serializers import OTPSerializer, VerifyOTPSerializer
+from .serializers import OTPSerializer, VerifyOTPSerializer, UserSerializer, UserDetailSerializer, SetPasswordSerializer
 from .throttles import RequestOTPThrottle
 from .models import OTP
+from .paginations import CustomLimitOffsetPagination
 
 
 User = get_user_model()
@@ -68,3 +72,25 @@ class VerifyOTPGenericAPIView(generics.GenericAPIView):
             
             except OTP.DoesNotExist:
                 return Response({'detail': _('Your one-time password is incorrect or has expired!')}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UserViewSet(ModelViewSet):
+    queryset = User.objects.order_by('-id')
+    pagination_class = CustomLimitOffsetPagination
+    permission_classes = [IsAdminUser]
+
+    def get_serializer_class(self):
+        if self.action in ['list', 'create']:
+            return UserSerializer
+        elif self.action == 'set_password':
+            return SetPasswordSerializer
+        return UserDetailSerializer
+    
+
+    @action(detail=True, methods=['POST'])
+    def set_password(self, request, *args, **kwargs):
+        user = self.get_object()
+        serializer = self.get_serializer(user, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({'detail': _("User's password has been successfully changed.")}, status=status.HTTP_200_OK)
