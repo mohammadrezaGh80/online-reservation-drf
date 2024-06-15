@@ -44,7 +44,7 @@ class PatientAdmin(admin.ModelAdmin):
 
 @admin.register(models.Doctor)
 class DoctorAdmin(admin.ModelAdmin):
-    list_display = ['first_name', 'last_name', 'medical_council_number', 'get_phone', 'gender', 'status', 'province', 'city']
+    list_display = ['get_phone', 'first_name', 'last_name', 'medical_council_number', 'gender', 'status', 'province', 'city']
     list_per_page = 15
     list_select_related = ['province', 'city', 'user']
     search_fields = ['first_name', 'last_name']

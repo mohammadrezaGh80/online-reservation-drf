@@ -1,7 +1,9 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
+from django.urls import reverse
+from django.http import HttpResponseRedirect
 
 from .models import OTP, CustomUser
 
@@ -48,7 +50,57 @@ class CustomUserAdmin(BaseUserAdmin):
     readonly_fields = ['is_staff', 'is_superuser']
     ordering = []
     filter_horizontal = []
+    actions = ['add_user_to_staff', 'remove_users_from_staff']
     list_per_page = 15
+
+    @admin.action(description=_('Add user to staff'))
+    def add_user_to_staff(self, request, queryset):
+        if queryset.count() > 1:
+            self.message_user(
+                request,
+                _('You cannot administer two or more users at the same time.'),
+                messages.WARNING
+            )
+            return
+
+        user = queryset.first()
+
+        if user.is_staff:
+            self.message_user(
+                request,
+                _('User(phone number: %(phone_number)s) is currently an admin.') % {'phone_number': user.phone},
+                messages.WARNING
+            )
+            return
+        elif not user.has_usable_password():
+            self.message_user(
+                request,
+                _('User(phone number: %(phone_number)s) does not have a password, please enter a password for the user.') % {'phone_number': user.phone},
+                messages.WARNING
+            )
+
+            url = (
+                reverse('admin:core_customuser_changelist')
+                + f'{user.id}/password/'
+            )
+
+            return HttpResponseRedirect(url)
+        
+        user.is_staff = True
+        user.save(update_fields=['is_staff'])
+        self.message_user(request, 
+                          _('User(phone number: %(phone_number)s) have been successfully admin.') % {'phone_number': user.phone},
+                          messages.SUCCESS)
+        
+    @admin.action(description=_('Remove users from staff'))
+    def remove_users_from_staff(self, request, queryset):
+        queryset = queryset.filter(is_staff=True)
+        
+        update_count = queryset.update(is_staff=False)
+        self.message_user(request, 
+                          _('%(update_count)d users have been removed from the admin.') % {'update_count': update_count},
+                          messages.SUCCESS)
+        
 
 
 @admin.register(OTP)

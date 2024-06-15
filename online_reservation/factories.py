@@ -1,4 +1,6 @@
 from django.contrib.auth import get_user_model
+from django.db.models import signals
+
 from factory.django import DjangoModelFactory
 
 import random
@@ -19,11 +21,13 @@ class InsuranceFactory(DjangoModelFactory):
     name = factory.LazyFunction(lambda: fake.word())
 
 
+@factory.django.mute_signals(signals.post_save)
 class CustomUserFactory(DjangoModelFactory):
     class Meta:
         model = User
 
     phone = factory.Sequence(lambda n: "09%09d" % n)
+    password = factory.PostGenerationMethodCall('set_unusable_password')
 
     @classmethod
     def _setup_next_sequence(cls):
