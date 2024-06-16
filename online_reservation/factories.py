@@ -105,10 +105,15 @@ class CommentFactory(DjangoModelFactory):
     body = factory.LazyFunction(lambda: fake.sentence(nb_words=12, variable_nb_words=True))
 
 
+def generate_reserve_datetime():
+    dt = fake.unique.date_time_ad(start_datetime=datetime(2022, 1, 1), end_datetime=datetime(2024, 1, 1), tzinfo=timezone.utc)
+    return dt.replace(second=0, microsecond=0)
+
+
 class ReserveFactory(DjangoModelFactory):
     class Meta:
         model = models.Reserve
     
     status = factory.LazyFunction(lambda: random.choice(models.Reserve.RESERVE_STATUS)[0])
     price = factory.LazyFunction(lambda: round(random.randint(5000, 100000), -3))
-    reserve_datetime = factory.LazyFunction(lambda: fake.unique.date_time_ad(start_datetime=datetime(2022, 1, 1), end_datetime=datetime(2024, 1, 1), tzinfo=timezone.utc))
+    reserve_datetime = factory.LazyFunction(generate_reserve_datetime)

@@ -21,8 +21,8 @@ API_LIST_CITIES = 'https://iran-locations-api.ir/api/v1/fa/cities'
 
 fake = Faker(locale='fa_IR')
 
-list_of_models = [Province, City, Insurance, Patient, Doctor, Specialty, 
-                  DoctorSpecialty, Comment, Reserve]
+list_of_models = [Reserve, Patient, Doctor, City, Province, Insurance, Specialty, 
+                  DoctorSpecialty, Comment]
 
 NUM_INSURANCES = 20
 NUM_PATIENTS = 40
