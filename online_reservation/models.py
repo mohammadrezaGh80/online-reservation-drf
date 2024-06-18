@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
+from django.core.exceptions import ValidationError
 
 from .validators import NationalCodeValidator, MedicalCouncilNumberValidator
 
@@ -9,7 +10,7 @@ User = get_user_model()
 
 
 class Province(models.Model):
-    name = models.CharField(max_length=255, verbose_name=_('Name'))
+    name = models.CharField(max_length=255, unique=True, verbose_name=_('Name'))
 
     def __str__(self):
         return self.name
@@ -25,6 +26,12 @@ class City(models.Model):
 
     def __str__(self):
         return self.name
+    
+    def clean(self):
+        super().clean()
+
+        if City.objects.filter(province=self.province, name=self.name).exists():
+            raise ValidationError(_('There is a city with this name in %(province_name)s.' % {'province_name': self.province.name}))
 
     class Meta:
         verbose_name = _('City')

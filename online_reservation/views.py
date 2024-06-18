@@ -3,8 +3,11 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAdminUser
 from django.utils.translation import gettext as _
+from django.http import Http404
 
-from .models import Province
+from functools import cached_property
+
+from .models import Province, City
 from . import serializers
 from .paginations import CustomLimitOffsetPagination
 
@@ -25,3 +28,24 @@ class ProvinceViewSet(ModelViewSet):
 
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CityViewSet(ModelViewSet):
+    serializer_class = serializers.CitySerializer
+    pagination_class = CustomLimitOffsetPagination
+
+    @cached_property
+    def province(self):
+        try:
+            province_pk = int(self.kwargs.get('province_pk'))
+            province = Province.objects.get(id=province_pk)
+        except (ValueError, Province.DoesNotExist):
+            raise Http404
+        
+        return province
+
+    def get_queryset(self):     
+        return City.objects.filter(province=self.province).order_by('-id')
+    
+    def get_serializer_context(self):
+        return {'province': self.province}

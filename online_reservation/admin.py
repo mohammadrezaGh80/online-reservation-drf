@@ -37,6 +37,7 @@ class CityAdmin(admin.ModelAdmin):
     list_display = ['name', 'province']
     list_per_page = 15
     search_fields = ['name']
+    autocomplete_fields = ['province']
     list_select_related = ['province']
 
 
