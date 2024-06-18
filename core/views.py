@@ -6,13 +6,14 @@ from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.viewsets import ModelViewSet
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import IsAdminUser
 from rest_framework.decorators import action
 
 from .serializers import OTPSerializer, VerifyOTPSerializer, UserSerializer, UserDetailSerializer, SetPasswordSerializer
 from .throttles import RequestOTPThrottle
 from .models import OTP
 from .paginations import CustomLimitOffsetPagination
+from online_reservation.models import Doctor
 
 
 User = get_user_model()
@@ -94,3 +95,15 @@ class UserViewSet(ModelViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response({'detail': _("User's password has been successfully changed.")}, status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        if getattr(instance, 'doctor', False) and instance.doctor.status == Doctor.DOCTOR_STATUS_ACCEPTED and instance.doctor.reserves.count() > 0:
+            return Response({'detail': _('There is some reserves relating this doctor, Please remove them first.')}, status=status.HTTP_400_BAD_REQUEST)
+        elif (getattr(instance, 'doctor', False) and instance.doctor.status != Doctor.DOCTOR_STATUS_ACCEPTED) or not getattr(instance, 'doctor', False):
+            if instance.patient.reserves.count() > 0:
+                return Response({'detail': _('There is some reserves relating this patient, Please remove them first.')}, status=status.HTTP_400_BAD_REQUEST)
+
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
