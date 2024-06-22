@@ -8,8 +8,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAdminUser
 from rest_framework.decorators import action
+from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .serializers import OTPSerializer, VerifyOTPSerializer, UserSerializer, UserDetailSerializer, SetPasswordSerializer
+from .serializers import OTPSerializer, VerifyOTPSerializer, UserSerializer, UserDetailSerializer, SetPasswordSerializer, CustomTokenObtainPairSerializer
 from .throttles import RequestOTPThrottle
 from .models import OTP
 from .paginations import CustomLimitOffsetPagination
@@ -107,3 +108,7 @@ class UserViewSet(ModelViewSet):
 
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer

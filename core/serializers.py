@@ -2,6 +2,10 @@ from django.utils.translation import gettext as _
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, PasswordField
+from rest_framework.exceptions import AuthenticationFailed
+
+from online_reservation.models import Doctor
 
 from .models import OTP
 
@@ -43,11 +47,19 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class UserDetailSerializer(serializers.ModelSerializer):
+    role = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'phone', 'is_active', 'is_staff', 'is_superuser']
+        fields = ['id', 'phone', 'is_active', 'is_staff', 'is_superuser', 'role']
         read_only_fields = ['phone']
+
+    def get_role(self, user):
+        if user.is_staff:
+            return 'admin'
+        elif getattr(user, 'doctor', False) and user.doctor.status == Doctor.DOCTOR_STATUS_ACCEPTED:
+            return 'doctor'
+        return 'patient' 
     
     def validate_is_staff(self, is_staff):
         if is_staff:
@@ -89,3 +101,22 @@ class SetPasswordSerializer(serializers.ModelSerializer):
         instance.set_password(password)
         instance.save(update_fields=['password'])
         return instance
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields[self.username_field] = serializers.CharField(write_only=True, label=_('Phone'))
+        self.fields['password'] = PasswordField(label=_('Password'))
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+
+        if not self.user.is_staff:
+            raise AuthenticationFailed(_('Only admin users can log in.'))
+
+        data['user_id'] = self.user.pk
+        data['phone'] = self.user.phone
+        
+        return data
