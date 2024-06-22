@@ -7,7 +7,7 @@ from django.http import Http404
 
 from functools import cached_property
 
-from .models import Province, City
+from .models import Insurance, Province, City
 from . import serializers
 from .paginations import CustomLimitOffsetPagination
 
@@ -49,3 +49,23 @@ class CityViewSet(ModelViewSet):
     
     def get_serializer_context(self):
         return {'province': self.province}
+
+
+class InsuranceViewSet(ModelViewSet):
+    queryset = Insurance.objects.all().order_by('-id')
+    permission_classes = [IsAdminUser]
+    pagination_class = CustomLimitOffsetPagination
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return serializers.InsuranceDetailSerializer
+        return serializers.InsuranceSerializer
+    
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        if instance.patients.count() > 0:
+            return Response({'detail': _('There is some patients relating this insurance, Please remove them first.')}, status=status.HTTP_400_BAD_REQUEST)
+
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

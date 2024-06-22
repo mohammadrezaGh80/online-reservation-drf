@@ -1,7 +1,7 @@
 from django.utils.translation import gettext as _
 from rest_framework import serializers
 
-from .models import Province, City
+from .models import Insurance, Province, City
 
 
 class ProvinceSerializer(serializers.ModelSerializer):
@@ -34,3 +34,21 @@ class CitySerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         province = self.context.get('province')
         return City.objects.create(province=province, **validated_data)
+
+
+class InsuranceSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Insurance
+        fields = ['id', 'name']
+
+
+class InsuranceDetailSerializer(serializers.ModelSerializer):
+    patients_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Insurance
+        fields = ['id', 'name', 'patients_count']
+
+    def get_patients_count(self, insurance):
+        return insurance.patients.count()
