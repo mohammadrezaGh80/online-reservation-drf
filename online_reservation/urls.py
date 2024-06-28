@@ -11,6 +11,7 @@ app_name = 'online_reservation'
 router = DefaultRouter()
 router.register('provinces', views.ProvinceViewSet, basename='province')
 router.register('insurances', views.InsuranceViewSet, basename='insurance')
+router.register('patients', views.PatientViewSet, basename='patient')
 
 provinces_router = routers.NestedDefaultRouter(router, 'provinces', lookup='province')
 provinces_router.register('cities', views.CityViewSet, basename='province-cities')

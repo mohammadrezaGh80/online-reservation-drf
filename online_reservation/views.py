@@ -1,13 +1,14 @@
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.decorators import action
 from django.utils.translation import gettext as _
 from django.http import Http404
 
 from functools import cached_property
 
-from .models import Insurance, Province, City
+from .models import Insurance, Patient, Province, City
 from . import serializers
 from .paginations import CustomLimitOffsetPagination
 
@@ -28,6 +29,11 @@ class ProvinceViewSet(ModelViewSet):
 
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return serializers.ProvinceDetailSerializer
+        return serializers.ProvinceSerializer
 
 
 class CityViewSet(ModelViewSet):
@@ -69,3 +75,37 @@ class InsuranceViewSet(ModelViewSet):
 
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PatientViewSet(ModelViewSet):
+    http_method_names = ['get', 'head', 'options', 'put']
+    queryset = Patient.objects.select_related('insurance', 'user').order_by('-created_datetime')
+    pagination_class = CustomLimitOffsetPagination
+    permission_classes = [IsAdminUser]
+
+    def get_queryset(self):
+        queryset = Patient.objects.select_related('insurance', 'user').order_by('-created_datetime')
+        if self.action == 'retrieve':
+            return queryset.select_related('province', 'city')
+        return queryset
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return serializers.PatientSerializer
+        elif self.action == 'retrieve':
+            return serializers.PatientDetailSerializer
+        return serializers.PatientUpdateSerializer
+    
+    @action(detail=False, methods=['GET', 'PUT'], permission_classes=[IsAuthenticated])
+    def me(self, request, *args, **kwargs):
+        user = request.user
+        patient = self.queryset.select_related('province', 'city').get(id=user.patient.id)
+
+        if request.method == 'GET':
+            serializer = serializers.PatientDetailSerializer(patient)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        elif request.method == 'PUT':
+            serializer = serializers.PatientUpdateSerializer(patient, data=request.data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)

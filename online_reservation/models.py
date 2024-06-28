@@ -87,6 +87,20 @@ class Patient(Person):
 
     created_datetime = models.DateTimeField(auto_now_add=True, verbose_name=_('Created datetime'))
 
+    def clean(self):
+        super().clean()
+
+        if not self.national_code and not self.is_foreign_national:
+            raise ValidationError(_('national_code field may not be blank.'))
+
+        if not City.objects.filter(id=self.city.id, province_id=self.province.id).exists():
+            raise ValidationError(_("There isn't %(city_name)s city in %(province_name)s province.") % {'city_name': self.city.name, 'province_name': self.province.name})
+
+    def save(self, *args, **kwargs):
+        if self.is_foreign_national:
+            self.national_code = ''
+        return super().save(*args, **kwargs)
+
     def __str__(self):
         return self.full_name if self.full_name else self.user.phone
 
@@ -131,6 +145,12 @@ class Doctor(Person):
     city = models.ForeignKey(City, blank=True, null=True, on_delete=models.PROTECT, related_name='doctors', verbose_name=_('City')) # TODO: validate for city that exist in province
 
     confirm_datetime = models.DateTimeField(blank=True, null=True, verbose_name=_('Confirm datetime')) # TODO: when status is accepted, this field be filled
+
+    def clean(self):
+        super().clean()
+
+        if not City.objects.filter(id=self.city.id, province_id=self.province.id).exists():
+            raise ValidationError(_("There isn't %(city_name)s city in %(province_name)s province.") % {'city_name': self.city.name, 'province_name': self.province.name})
 
     def __str__(self):
         return f'{self.full_name}(M.C.NO: {self.medical_council_number})'
