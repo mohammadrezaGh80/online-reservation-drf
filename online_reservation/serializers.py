@@ -66,10 +66,10 @@ class InsuranceDetailSerializer(serializers.ModelSerializer):
 
 class PatientSerializer(serializers.ModelSerializer):
     user = serializers.CharField(source='user.phone')
-    insurance = serializers.SerializerMethodField()
+    province = ProvinceSerializer()
+    city = CitySerializer()
+    insurance = InsuranceSerializer()
     age = serializers.SerializerMethodField()
-    province = serializers.CharField(source='province.name')
-    city = serializers.CharField(source='city.name')
 
     class Meta:
         model = Patient
