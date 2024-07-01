@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from datetime import date
 
-from .models import Insurance, Patient, Province, City
+from .models import Doctor, Insurance, Patient, Province, City, Reserve
 
 
 class ProvinceSerializer(serializers.ModelSerializer):
@@ -68,11 +68,14 @@ class PatientSerializer(serializers.ModelSerializer):
     user = serializers.CharField(source='user.phone')
     insurance = serializers.SerializerMethodField()
     age = serializers.SerializerMethodField()
+    province = serializers.CharField(source='province.name')
+    city = serializers.CharField(source='city.name')
 
     class Meta:
         model = Patient
         fields = ['id', 'user', 'first_name', 'last_name', 'gender', 'age',
-                  'insurance', 'is_foreign_national', 'national_code']
+                  'province', 'city', 'insurance', 'is_foreign_national', 
+                  'national_code']
 
     def get_insurance(self, patient):
         if patient.insurance:
@@ -155,4 +158,67 @@ class PatientUpdateSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         representation['gender'] = instance.get_gender_display()
+        return representation
+    
+
+class DoctorSerializer(serializers.ModelSerializer):
+    age = serializers.SerializerMethodField()
+    province = serializers.CharField(source='province.name')
+    city = serializers.CharField(source='city.name')
+
+    class Meta:
+        model = Doctor
+        fields = ['id', 'first_name', 'last_name', 'gender', 'age',
+                  'medical_council_number', 'province', 'city', 'office_address']
+        
+    def get_age(self, patient):
+        if patient.birth_date:
+            return (date.today() - patient.birth_date).days // 365
+        return None
+    
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['gender'] = instance.get_gender_display()
+        return representation
+
+
+class ReservePatientSerializer(serializers.ModelSerializer):
+    doctor = serializers.CharField(source='doctor.full_name')
+    reserve_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+
+    class Meta:
+        model = Reserve
+        fields = ['id', 'doctor', 'status', 'price', 'reserve_datetime']
+        read_only_fields = ['status']
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['status'] = instance.get_status_display()
+        return representation
+
+
+class ReservePatientDetailSerializer(serializers.ModelSerializer):
+    doctor = DoctorSerializer()
+    reserve_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+
+    class Meta:
+        model = Reserve
+        fields = ['id', 'doctor', 'status', 'price', 'reserve_datetime']
+        read_only_fields = ['status']
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['status'] = instance.get_status_display()
+        return representation
+
+
+class ReservePatientUpdateSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Reserve
+        fields = ['id', 'status']
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['status'] = instance.get_status_display()
         return representation

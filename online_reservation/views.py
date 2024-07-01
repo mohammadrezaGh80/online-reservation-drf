@@ -8,7 +8,7 @@ from django.http import Http404
 
 from functools import cached_property
 
-from .models import Insurance, Patient, Province, City
+from .models import Insurance, Patient, Province, City, Reserve
 from . import serializers
 from .paginations import CustomLimitOffsetPagination
 
@@ -109,3 +109,43 @@ class PatientViewSet(ModelViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ReservePatientViewSet(ModelViewSet):
+    http_method_names = ['get', 'head', 'options', 'patch', 'delete']
+    pagination_class = CustomLimitOffsetPagination
+
+    @cached_property
+    def patient(self):
+        patient_pk = self.kwargs.get('patient_pk')
+
+        if patient_pk == 'me':
+            patient = Patient.objects.get(user=self.request.user)
+        else:
+            try:
+                patient = Patient.objects.get(user_id=patient_pk)
+            except (Patient.DoesNotExist, ValueError):
+                raise Http404
+
+        return patient
+    
+    def get_permissions(self):
+        patient_pk = self.kwargs.get('patient_pk')
+
+        if patient_pk == 'me' and self.action not in ['partial_update', 'destroy']:
+            return [IsAuthenticated()]
+        else:
+            return [IsAdminUser()]
+    
+    def get_queryset(self):
+        queryset = Reserve.objects.select_related('doctor').filter(patient=self.patient)
+        if self.action == 'retrieve':
+            return queryset.select_related('doctor__province', 'doctor__city')
+        return queryset
+    
+    def get_serializer_class(self):
+        if self.action == 'partial_update':
+            return serializers.ReservePatientUpdateSerializer
+        elif self.action == 'retrieve':
+            return serializers.ReservePatientDetailSerializer
+        return serializers.ReservePatientSerializer
