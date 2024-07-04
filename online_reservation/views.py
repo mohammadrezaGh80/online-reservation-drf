@@ -13,7 +13,7 @@ from functools import cached_property
 from .models import Doctor, DoctorSpecialty, Insurance, Patient, Province, City, Reserve
 from . import serializers
 from .paginations import CustomLimitOffsetPagination
-from .filters import PatientFilter
+from .filters import PatientFilter, DoctorFilter
 from .permissions import IsAdminUserOrDoctorOwner
 
 
@@ -169,6 +169,8 @@ class DoctorViewSet(ModelViewSet):
                              queryset=DoctorSpecialty.objects.select_related('specialty'))
                 ).order_by('-confirm_datetime')
     pagination_class = CustomLimitOffsetPagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = DoctorFilter
 
     def get_serializer_class(self):
         if self.action == 'retrieve':

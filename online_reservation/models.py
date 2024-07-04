@@ -174,6 +174,19 @@ class Doctor(Person):
         ]
 
 
+class DoctorInsurance(models.Model):
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='insurances', verbose_name=_('Doctor'))
+    insurance = models.ForeignKey(Insurance, on_delete=models.CASCADE, related_name='doctors', verbose_name=_('Insurance'))
+
+    def __str__(self):
+        return f'{self.doctor.full_name} covers {self.insurance.name} insurance'
+    
+    class Meta:
+        unique_together = [['doctor', 'insurance']]
+        verbose_name = _('Doctor insurance')
+        verbose_name_plural = _('Doctor insurances')
+
+
 class Specialty(models.Model):
     name = models.CharField(max_length=255, verbose_name=_('Name'))
 

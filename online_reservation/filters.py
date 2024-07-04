@@ -4,38 +4,35 @@ from django.shortcuts import get_object_or_404
 import django_filters
 from datetime import date, timedelta
 
-from .models import Province, City, Insurance
+from .models import Province, City, Insurance, Specialty
 
 
-class PatientFilter(django_filters.FilterSet):
+class PersonFilter(django_filters.FilterSet):
+    PERSON_GENDER_MALE = 'm'
+    PERSON_GENDER_FEMALE = 'f'
+    PERSON_GENDER_NOT_DEFINED = 'n'
 
-    PATIENT_GENDER_MALE = 'm'
-    PATIENT_GENDER_FEMALE = 'f'
-    PATIENT_GENDER_NOT_DEFINED = 'n'
-
-    PATIENT_GENDER = [
-        (PATIENT_GENDER_MALE, _('Male')),
-        (PATIENT_GENDER_FEMALE, _('Female')),
-        (PATIENT_GENDER_NOT_DEFINED, _('Not defined'))
+    PERSON_GENDER = [
+        (PERSON_GENDER_MALE, _('Male')),
+        (PERSON_GENDER_FEMALE, _('Female')),
+        (PERSON_GENDER_NOT_DEFINED, _('Not defined'))
     ]
 
-    gender = django_filters.ChoiceFilter(field_name='gender', choices=PATIENT_GENDER, method='filter_gender', label='gender')
+    gender = django_filters.ChoiceFilter(field_name='gender', choices=PERSON_GENDER, method='filter_gender', label='gender')
     age = django_filters.NumberFilter(field_name='birth_date', method='filter_age', label='age')
     age_max = django_filters.NumberFilter(field_name='birth_date', method='filter_age_max', label='age_max')
     age_min = django_filters.NumberFilter(field_name='birth_date', method='filter_age_min', label='age_min')
-    is_foreign_national = django_filters.BooleanFilter(field_name='is_foreign_national', label='is_foreign_national')
     province = django_filters.NumberFilter(field_name='province', method='filter_province', label='province')
     city = django_filters.NumberFilter(field_name='city', method='filter_city', label='city')
-    insurance = django_filters.NumberFilter(field_name='insurance', method='filter_insurance', label='insurance')
 
     def filter_gender(self, queryset, field_name, value):
-        if value == self.PATIENT_GENDER_MALE:
-            filter_condition = {field_name: self.PATIENT_GENDER_MALE}
+        if value == self.PERSON_GENDER_MALE:
+            filter_condition = {field_name: self.PERSON_GENDER_MALE}
             return queryset.filter(**filter_condition)
-        elif value == self.PATIENT_GENDER_FEMALE:
-            filter_condition = {field_name: self.PATIENT_GENDER_FEMALE}
+        elif value == self.PERSON_GENDER_FEMALE:
+            filter_condition = {field_name: self.PERSON_GENDER_FEMALE}
             return queryset.filter(**filter_condition)
-        elif value == self.PATIENT_GENDER_NOT_DEFINED:
+        elif value == self.PERSON_GENDER_NOT_DEFINED:
             filter_condition = {field_name: ''}
             return queryset.filter(**filter_condition)
     
@@ -61,11 +58,25 @@ class PatientFilter(django_filters.FilterSet):
         return queryset.filter(**filter_condition)
     
     def filter_city(self, queryset, field_name, value):
-        province = get_object_or_404(City, pk=value)
-        filter_condition = {field_name: province}
+        city = get_object_or_404(City, pk=value)
+        filter_condition = {field_name: city}
         return queryset.filter(**filter_condition)
+
+
+class PatientFilter(PersonFilter):
+    is_foreign_national = django_filters.BooleanFilter(field_name='is_foreign_national', label='is_foreign_national')
+    insurance = django_filters.NumberFilter(field_name='insurance', method='filter_insurance', label='insurance')
     
     def filter_insurance(self, queryset, field_name, value):
-        province = get_object_or_404(Insurance, pk=value)
-        filter_condition = {field_name: province}
+        insurance = get_object_or_404(Insurance, pk=value)
+        filter_condition = {field_name: insurance}
+        return queryset.filter(**filter_condition)
+
+
+class DoctorFilter(PersonFilter):
+    specialty = django_filters.NumberFilter(field_name='specialties__specialty', method='filter_specialty', label='specialty')
+
+    def filter_specialty(self, queryset, field_name, value):
+        specialty = get_object_or_404(Specialty, pk=value)
+        filter_condition = {field_name: specialty}
         return queryset.filter(**filter_condition)

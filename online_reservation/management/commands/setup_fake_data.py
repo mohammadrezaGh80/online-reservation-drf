@@ -6,7 +6,7 @@ import random
 from datetime import datetime, timezone
 
 from online_reservation.models import Province, City, Insurance, Patient, Doctor, \
-                                      Specialty, DoctorSpecialty, Comment, Reserve
+                                      Specialty, DoctorSpecialty, Comment, Reserve, DoctorInsurance
 from online_reservation.factories import (
     InsuranceFactory,
     PatientFactory,
@@ -21,8 +21,7 @@ API_LIST_CITIES = 'https://iran-locations-api.ir/api/v1/fa/cities'
 
 fake = Faker(locale='fa_IR')
 
-list_of_models = [Reserve, Patient, Doctor, City, Province, Insurance, Specialty, 
-                  DoctorSpecialty, Comment]
+list_of_models = [Reserve, Patient, Doctor, City, Province, Insurance, Specialty, Comment]
 
 NUM_INSURANCES = 20
 NUM_PATIENTS = 40
@@ -134,6 +133,23 @@ class Command(BaseCommand):
         # specialties data
         print(f'Adding {NUM_SPECIALTY} specialties...', end='')
         all_specialties = [SpecialtyFactory() for _ in range(NUM_SPECIALTY)]
+        print('DONE')
+
+        # doctor insurances data
+        print('Adding doctor insurances...', end='')
+        all_doctor_insurances = []
+
+        for doctor in all_doctors:
+            if random.random() <= 0.7:
+                insurances = random.sample(all_insurances, k=random.randint(1, 3))
+                for insurance in insurances:
+                    doctor_insurance = DoctorInsurance.objects.create(
+                        doctor_id=doctor.id,
+                        insurance_id=insurance.id
+                    )
+
+                    all_doctor_insurances.append(doctor_insurance)
+        
         print('DONE')
 
         # doctor specialties data
