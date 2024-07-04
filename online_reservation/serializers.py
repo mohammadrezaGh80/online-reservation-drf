@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from datetime import date, datetime
 
-from .models import Doctor, DoctorSpecialty, Insurance, Patient, Province, City, Reserve, Specialty
+from .models import Doctor, DoctorSpecialty, Insurance, Patient, Province, City, Reserve, Specialty, DoctorInsurance
 from .validators import NationalCodeValidator
 
 
@@ -164,11 +164,20 @@ class PatientUpdateSerializer(serializers.ModelSerializer):
 
 
 class DoctorSpecialtySerializer(serializers.ModelSerializer):
-    name = serializers.CharField(source='specialty.name')
     id = serializers.IntegerField(source='specialty.id')
+    name = serializers.CharField(source='specialty.name')
 
     class Meta:
         model = DoctorSpecialty
+        fields = ['id', 'name']
+
+
+class DoctorInsuranceSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(source='insurance.id')
+    name = serializers.CharField(source='insurance.name')
+
+    class Meta:
+        model = DoctorInsurance
         fields = ['id', 'name']
     
 
@@ -181,13 +190,14 @@ class DoctorSerializer(serializers.ModelSerializer):
     successful_reserve_count = serializers.SerializerMethodField()
     specialties = DoctorSpecialtySerializer(many=True)
     confirm_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+    is_cover_insurance = serializers.SerializerMethodField()
 
     class Meta:
         model = Doctor
         fields = ['id', 'first_name', 'last_name', 'gender', 'age', 'status', 
                   'confirm_datetime', 'rating_average', 'comment_count', 
-                  'successful_reserve_count', 'medical_council_number', 'specialties', 
-                  'province', 'city', 'office_address']
+                  'successful_reserve_count', 'medical_council_number', 'specialties',
+                  'is_cover_insurance', 'province', 'city', 'office_address']
         
     def get_age(self, doctor):
         if doctor.birth_date:
@@ -210,6 +220,9 @@ class DoctorSerializer(serializers.ModelSerializer):
     def get_successful_reserve_count(self, doctor):
         return len(doctor.doctor_reserves)
     
+    def get_is_cover_insurance(self, doctor):
+        return bool(doctor.insurances.count())
+    
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         representation['gender'] = instance.get_gender_display()
@@ -228,13 +241,14 @@ class DoctorDetailSerializer(serializers.ModelSerializer):
     specialties = DoctorSpecialtySerializer(many=True)
     birth_date = serializers.DateField(format='%Y-%m-%d')
     confirm_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+    insurances = DoctorInsuranceSerializer(many=True)
 
     class Meta:
         model = Doctor
         fields = ['id', 'phone', 'first_name', 'last_name', 'gender', 'birth_date',
                   'age', 'email', 'status', 'confirm_datetime', 'rating_average', 
                   'comment_count', 'successful_reserve_count', 'medical_council_number', 
-                  'specialties', 'national_code', 'province', 'city', 
+                  'specialties', 'national_code', 'insurances', 'province', 'city', 
                   'office_address', 'bio']
         
     def get_age(self, doctor):
@@ -276,12 +290,18 @@ class DoctorCreateSerializer(serializers.ModelSerializer):
         write_only=True
     )
     specialties = DoctorSpecialtySerializer(many=True, read_only=True)
+    insurances_list = serializers.ListField(
+        child=serializers.PrimaryKeyRelatedField(queryset=Insurance.objects.all()),
+        write_only=True,
+        required=False
+    )
+    insurances = DoctorInsuranceSerializer(many=True, read_only=True)
 
     class Meta:
         model = Doctor
         fields = ['id', 'user', 'medical_council_number', 'first_name', 'last_name', 
                   'national_code', 'office_address', 'province', 'city', 'email', 
-                  'gender', 'specialties_list', 'specialties']
+                  'gender', 'specialties_list', 'specialties', 'insurances_list', 'insurances']
         
     def validate_gender(self, gender):
         if gender not in [Doctor.PERSON_GENDER_MALE, Doctor.PERSON_GENDER_FEMALE]:
@@ -289,7 +309,7 @@ class DoctorCreateSerializer(serializers.ModelSerializer):
         return gender
     
     def validate(self, attrs):
-        new_attrs = {key:attrs.get(key) for key in attrs.keys() if key != 'specialties_list'}
+        new_attrs = {key:attrs.get(key) for key in attrs.keys() if key not in ['specialties_list', 'insurances_list']}
         instance = Doctor(**new_attrs)
 
         try:
@@ -302,6 +322,7 @@ class DoctorCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         with transaction.atomic():
             specialties_list = validated_data.pop('specialties_list')
+            insurances_list = validated_data.pop('insurances_list', None)
 
             doctor = Doctor.objects.create(
                 **validated_data,
@@ -316,6 +337,16 @@ class DoctorCreateSerializer(serializers.ModelSerializer):
                     )
                 DoctorSpecialty.objects.create(
                     specialty=specialty,
+                    doctor=doctor
+                )
+            
+            for insurance in insurances_list:
+                if DoctorInsurance.objects.filter(doctor=doctor, insurance=insurance).exists():
+                    raise serializers.ValidationError(
+                        {'detail': _('The doctor %(doctor_full_name)s has already covers %(insurance_name)s insurance') % {'doctor_full_name': doctor.full_name, 'insurance_name': insurance.name}}
+                    )
+                DoctorInsurance.objects.create(
+                    insurance=insurance,
                     doctor=doctor
                 )
             
@@ -338,12 +369,18 @@ class DoctorUpdateSerializer(serializers.ModelSerializer):
         write_only=True
     )
     specialties = DoctorSpecialtySerializer(many=True, read_only=True)
+    insurances_list = serializers.ListField(
+        child=serializers.PrimaryKeyRelatedField(queryset=Insurance.objects.all()),
+        write_only=True,
+        required=False
+    )
+    insurances = DoctorInsuranceSerializer(many=True, read_only=True)
 
     class Meta:
         model = Doctor
         fields = ['id', 'medical_council_number', 'first_name', 'last_name', 
                   'national_code', 'office_address', 'province', 'city', 'email', 
-                  'gender', 'specialties_list', 'specialties']
+                  'gender', 'specialties_list', 'specialties', 'insurances_list', 'insurances']
         
     def validate_gender(self, gender):
         if gender not in [Doctor.PERSON_GENDER_MALE, Doctor.PERSON_GENDER_FEMALE]:
@@ -351,7 +388,7 @@ class DoctorUpdateSerializer(serializers.ModelSerializer):
         return gender
     
     def validate(self, attrs):
-        new_attrs = {key:attrs.get(key) for key in attrs.keys() if key != 'specialties_list'}
+        new_attrs = {key:attrs.get(key) for key in attrs.keys() if key not in ['specialties_list', 'insurances_list']}
         instance = Doctor(**new_attrs)
 
         try:
@@ -364,6 +401,7 @@ class DoctorUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
        with transaction.atomic():
             specialties_list = validated_data.pop('specialties_list', None)
+            insurances_list = validated_data.pop('insurances_list', None)
 
             if specialties_list:
                 instance.specialties.all().delete()
@@ -376,7 +414,19 @@ class DoctorUpdateSerializer(serializers.ModelSerializer):
                     DoctorSpecialty.objects.create(
                         specialty=specialty,
                         doctor=instance
-                    )            
+                    )  
+            if insurances_list:  
+                instance.insurances.all().delete()   
+
+                for insurance in insurances_list:
+                    if DoctorInsurance.objects.filter(doctor=instance, insurance=insurance).exists():
+                        raise serializers.ValidationError(
+                            {'detail': _('The doctor %(doctor_full_name)s has already covers %(insurance_name)s insurance') % {'doctor_full_name': instance.full_name, 'insurance_name': insurance.name}}
+                        )
+                    DoctorInsurance.objects.create(
+                        insurance=insurance,
+                        doctor=instance
+                    )     
 
             return super().update(instance, validated_data)
        

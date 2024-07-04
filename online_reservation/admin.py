@@ -155,6 +155,19 @@ class SpecialtyAdmin(admin.ModelAdmin):
         return format_html('<a href={}>{}</a>', url, specialty.doctors_count)
 
 
+@admin.register(models.DoctorInsurance)
+class DoctorInsuranceAdmin(admin.ModelAdmin):
+    list_display = ['get_full_name', 'insurance']
+    list_per_page = 15
+    search_fields = ['doctor__first_name', 'doctor__last_name', 'insurance__name']
+    autocomplete_fields = ['doctor', 'insurance']
+    list_select_related = ['doctor', 'insurance']
+
+    @admin.display(description=_('full_name'))
+    def get_full_name(self, doctor_specialty):
+        return doctor_specialty.doctor.full_name
+
+
 @admin.register(models.DoctorSpecialty)
 class DoctorSpecialtyAdmin(admin.ModelAdmin):
     list_display = ['get_full_name', 'specialty']

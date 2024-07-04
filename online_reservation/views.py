@@ -10,7 +10,7 @@ from django.db.models import Prefetch
 from django_filters.rest_framework import DjangoFilterBackend
 from functools import cached_property
 
-from .models import Doctor, DoctorSpecialty, Insurance, Patient, Province, City, Reserve
+from .models import Doctor, DoctorInsurance, DoctorSpecialty, Insurance, Patient, Province, City, Reserve
 from . import serializers
 from .paginations import CustomLimitOffsetPagination
 from .filters import PatientFilter, DoctorFilter
@@ -167,6 +167,9 @@ class DoctorViewSet(ModelViewSet):
                 ).prefetch_related(
                     Prefetch('specialties',
                              queryset=DoctorSpecialty.objects.select_related('specialty'))
+                ).prefetch_related(
+                    Prefetch('insurances',
+                             queryset=DoctorInsurance.objects.select_related('insurance'))
                 ).order_by('-confirm_datetime')
     pagination_class = CustomLimitOffsetPagination
     filter_backends = [DjangoFilterBackend]

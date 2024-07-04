@@ -75,8 +75,14 @@ class PatientFilter(PersonFilter):
 
 class DoctorFilter(PersonFilter):
     specialty = django_filters.NumberFilter(field_name='specialties__specialty', method='filter_specialty', label='specialty')
+    insurance = django_filters.NumberFilter(field_name='insurances__insurance', method='filter_insurance', label='insurance')
 
     def filter_specialty(self, queryset, field_name, value):
         specialty = get_object_or_404(Specialty, pk=value)
         filter_condition = {field_name: specialty}
+        return queryset.filter(**filter_condition)
+    
+    def filter_insurance(self, queryset, field_name, value):
+        insurance = get_object_or_404(Insurance, pk=value)
+        filter_condition = {field_name: insurance}
         return queryset.filter(**filter_condition)
