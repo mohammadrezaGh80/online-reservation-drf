@@ -1,10 +1,12 @@
 from django.utils.translation import gettext as _
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from rest_framework import serializers
 
-from datetime import date
+from datetime import date, datetime
 
-from .models import Doctor, Insurance, Patient, Province, City, Reserve
+from .models import Doctor, DoctorSpecialty, Insurance, Patient, Province, City, Reserve, Specialty
+from .validators import NationalCodeValidator
 
 
 class ProvinceSerializer(serializers.ModelSerializer):
@@ -119,12 +121,12 @@ class PatientDetailSerializer(serializers.ModelSerializer):
 
 class PatientUpdateSerializer(serializers.ModelSerializer):
     phone = serializers.CharField(source='user.phone', read_only=True)
-    first_name = serializers.CharField(max_length=255, label=_('First name'))
-    last_name = serializers.CharField(max_length=255, label=_('Last name'))
-    birth_date = serializers.DateField(format='%Y-%m-%d', label=_('Birth date'))
+    first_name = serializers.CharField(max_length=255)
+    last_name = serializers.CharField(max_length=255)
+    birth_date = serializers.DateField(format='%Y-%m-%d')
     gender = serializers.ChoiceField(choices=Patient.PERSON_GENDER)
-    province = serializers.PrimaryKeyRelatedField(queryset=Province.objects.all(), label=_('Province'))
-    city = serializers.PrimaryKeyRelatedField(queryset=City.objects.all(), label=_('City'))
+    province = serializers.PrimaryKeyRelatedField(queryset=Province.objects.all())
+    city = serializers.PrimaryKeyRelatedField(queryset=City.objects.all())
 
     class Meta:
         model = Patient
@@ -159,23 +161,225 @@ class PatientUpdateSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         representation['gender'] = instance.get_gender_display()
         return representation
+
+
+class DoctorSpecialtySerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source='specialty.name')
+    id = serializers.IntegerField(source='specialty.id')
+
+    class Meta:
+        model = DoctorSpecialty
+        fields = ['id', 'name']
     
 
 class DoctorSerializer(serializers.ModelSerializer):
     age = serializers.SerializerMethodField()
-    province = serializers.CharField(source='province.name')
-    city = serializers.CharField(source='city.name')
+    province = ProvinceSerializer()
+    city = CitySerializer()
+    rating_average = serializers.SerializerMethodField()
+    comment_count = serializers.SerializerMethodField()
+    successful_reserve_count = serializers.SerializerMethodField()
+    specialties = DoctorSpecialtySerializer(many=True)
+    confirm_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
 
     class Meta:
         model = Doctor
-        fields = ['id', 'first_name', 'last_name', 'gender', 'age',
-                  'medical_council_number', 'province', 'city', 'office_address']
+        fields = ['id', 'first_name', 'last_name', 'gender', 'age', 'status', 
+                  'confirm_datetime', 'rating_average', 'comment_count', 
+                  'successful_reserve_count', 'medical_council_number', 'specialties', 
+                  'province', 'city', 'office_address']
         
-    def get_age(self, patient):
-        if patient.birth_date:
-            return (date.today() - patient.birth_date).days // 365
+    def get_age(self, doctor):
+        if doctor.birth_date:
+            return (date.today() - doctor.birth_date).days // 365
         return None
     
+    def get_rating_average(self, doctor):
+        try:
+            rating_average = round(sum([comment.rating for comment in doctor.comments.all()]) / doctor.comments.count(), 1)
+            
+            if rating_average == int(rating_average):
+                return int(rating_average)
+            return rating_average
+        except ZeroDivisionError:
+            return None
+
+    def get_comment_count(self, doctor):
+        return doctor.comments.count()
+    
+    def get_successful_reserve_count(self, doctor):
+        return len(doctor.doctor_reserves)
+    
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['gender'] = instance.get_gender_display()
+        representation['status'] = instance.get_status_display()
+        return representation
+    
+
+class DoctorDetailSerializer(serializers.ModelSerializer):
+    phone = serializers.CharField(source='user.phone', read_only=True)
+    age = serializers.SerializerMethodField()
+    province = ProvinceSerializer()
+    city = CitySerializer()
+    rating_average = serializers.SerializerMethodField()
+    comment_count = serializers.SerializerMethodField()
+    successful_reserve_count = serializers.SerializerMethodField()
+    specialties = DoctorSpecialtySerializer(many=True)
+    birth_date = serializers.DateField(format='%Y-%m-%d')
+    confirm_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+
+    class Meta:
+        model = Doctor
+        fields = ['id', 'phone', 'first_name', 'last_name', 'gender', 'birth_date',
+                  'age', 'email', 'status', 'confirm_datetime', 'rating_average', 
+                  'comment_count', 'successful_reserve_count', 'medical_council_number', 
+                  'specialties', 'national_code', 'province', 'city', 
+                  'office_address', 'bio']
+        
+    def get_age(self, doctor):
+        if doctor.birth_date:
+            return (date.today() - doctor.birth_date).days // 365
+        return None
+    
+    def get_rating_average(self, doctor):
+        try:
+            rating_average = round(sum([comment.rating for comment in doctor.comments.all()]) / doctor.comments.count(), 1)
+            
+            if rating_average == int(rating_average):
+                return int(rating_average)
+            return rating_average
+        except ZeroDivisionError:
+            return None
+
+    def get_comment_count(self, doctor):
+        return doctor.comments.count()
+    
+    def get_successful_reserve_count(self, doctor):
+        return len(doctor.doctor_reserves)
+    
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['gender'] = instance.get_gender_display()
+        representation['status'] = instance.get_status_display()
+        return representation
+
+
+class DoctorCreateSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(max_length=255)
+    last_name = serializers.CharField(max_length=255)
+    national_code = serializers.CharField(max_length=10, validators=[NationalCodeValidator()])
+    gender = serializers.ChoiceField(choices=Doctor.PERSON_GENDER)
+    office_address = serializers.CharField()
+    specialties_list = serializers.ListField(
+        child=serializers.PrimaryKeyRelatedField(queryset=Specialty.objects.all()),
+        write_only=True
+    )
+    specialties = DoctorSpecialtySerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Doctor
+        fields = ['id', 'user', 'medical_council_number', 'first_name', 'last_name', 
+                  'national_code', 'office_address', 'province', 'city', 'email', 
+                  'gender', 'specialties_list', 'specialties']
+        
+    def validate_gender(self, gender):
+        if gender not in [Doctor.PERSON_GENDER_MALE, Doctor.PERSON_GENDER_FEMALE]:
+            raise serializers.ValidationError(_('Please choose your gender.'))
+        return gender
+    
+    def validate(self, attrs):
+        new_attrs = {key:attrs.get(key) for key in attrs.keys() if key != 'specialties_list'}
+        instance = Doctor(**new_attrs)
+
+        try:
+            instance.clean()
+        except ValidationError as e:
+            raise serializers.ValidationError({"detail": e.messages})
+
+        return super().validate(attrs)
+    
+    def create(self, validated_data):
+        with transaction.atomic():
+            specialties_list = validated_data.pop('specialties_list')
+
+            doctor = Doctor.objects.create(
+                **validated_data,
+                status=Doctor.DOCTOR_STATUS_ACCEPTED,
+                confirm_datetime=datetime.now()
+            )
+
+            for specialty in specialties_list:
+                if DoctorSpecialty.objects.filter(doctor=doctor, specialty=specialty).exists():
+                    raise serializers.ValidationError(
+                        {'detail': _('The doctor %(doctor_full_name)s has already the specialty %(specialty_name)s') % {'doctor_full_name': doctor.full_name, 'specialty_name': specialty.name}}
+                    )
+                DoctorSpecialty.objects.create(
+                    specialty=specialty,
+                    doctor=doctor
+                )
+            
+            return doctor
+    
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['gender'] = instance.get_gender_display()
+        return representation
+
+
+class DoctorUpdateSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(max_length=255)
+    last_name = serializers.CharField(max_length=255)
+    national_code = serializers.CharField(max_length=10, validators=[NationalCodeValidator()])
+    gender = serializers.ChoiceField(choices=Doctor.PERSON_GENDER)
+    office_address = serializers.CharField()
+    specialties_list = serializers.ListField(
+        child=serializers.PrimaryKeyRelatedField(queryset=Specialty.objects.all()),
+        write_only=True
+    )
+    specialties = DoctorSpecialtySerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Doctor
+        fields = ['id', 'medical_council_number', 'first_name', 'last_name', 
+                  'national_code', 'office_address', 'province', 'city', 'email', 
+                  'gender', 'specialties_list', 'specialties']
+        
+    def validate_gender(self, gender):
+        if gender not in [Doctor.PERSON_GENDER_MALE, Doctor.PERSON_GENDER_FEMALE]:
+            raise serializers.ValidationError(_('Please choose your gender.'))
+        return gender
+    
+    def validate(self, attrs):
+        new_attrs = {key:attrs.get(key) for key in attrs.keys() if key != 'specialties_list'}
+        instance = Doctor(**new_attrs)
+
+        try:
+            instance.clean()
+        except ValidationError as e:
+            raise serializers.ValidationError({"detail": e.messages})
+
+        return super().validate(attrs)
+    
+    def update(self, instance, validated_data):
+       with transaction.atomic():
+            specialties_list = validated_data.pop('specialties_list', None)
+
+            if specialties_list:
+                instance.specialties.all().delete()
+
+                for specialty in specialties_list:
+                    if DoctorSpecialty.objects.filter(doctor=instance, specialty=specialty).exists():
+                        raise serializers.ValidationError(
+                            {'detail': _('The doctor %(doctor_full_name)s has already the specialty %(specialty_name)s') % {'doctor_full_name': instance.full_name, 'specialty_name': specialty.name}}
+                        )
+                    DoctorSpecialty.objects.create(
+                        specialty=specialty,
+                        doctor=instance
+                    )            
+
+            return super().update(instance, validated_data)
+       
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         representation['gender'] = instance.get_gender_display()

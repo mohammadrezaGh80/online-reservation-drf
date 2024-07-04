@@ -93,7 +93,7 @@ class Patient(Person):
         if not self.national_code and not self.is_foreign_national:
             raise ValidationError(_('national_code field may not be blank.'))
 
-        if not City.objects.filter(id=self.city.id, province_id=self.province.id).exists():
+        if self.city and self.province and not City.objects.filter(id=self.city.id, province_id=self.province.id).exists():
             raise ValidationError(_("There isn't %(city_name)s city in %(province_name)s province.") % {'city_name': self.city.name, 'province_name': self.province.name})
 
     def save(self, *args, **kwargs):
@@ -149,7 +149,7 @@ class Doctor(Person):
     def clean(self):
         super().clean()
 
-        if not City.objects.filter(id=self.city.id, province_id=self.province.id).exists():
+        if self.city and self.province and not City.objects.filter(id=self.city.id, province_id=self.province.id).exists():
             raise ValidationError(_("There isn't %(city_name)s city in %(province_name)s province.") % {'city_name': self.city.name, 'province_name': self.province.name})
 
     def __str__(self):
@@ -193,6 +193,7 @@ class DoctorSpecialty(models.Model):
         return f'{self.doctor.full_name} specialist {self.specialty}'
     
     class Meta:
+        unique_together = [['doctor', 'specialty']]
         verbose_name = _('Doctor specialty')
         verbose_name_plural = _('Doctor specialties')
 

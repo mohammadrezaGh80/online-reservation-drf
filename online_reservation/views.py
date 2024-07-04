@@ -5,14 +5,16 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.decorators import action
 from django.utils.translation import gettext as _
 from django.http import Http404
+from django.db.models import Prefetch
 
 from django_filters.rest_framework import DjangoFilterBackend
 from functools import cached_property
 
-from .models import Insurance, Patient, Province, City, Reserve
+from .models import Doctor, DoctorSpecialty, Insurance, Patient, Province, City, Reserve
 from . import serializers
 from .paginations import CustomLimitOffsetPagination
 from .filters import PatientFilter
+from .permissions import IsAdminUserOrDoctorOwner
 
 
 class ProvinceViewSet(ModelViewSet):
@@ -138,7 +140,14 @@ class ReservePatientViewSet(ModelViewSet):
     def get_queryset(self):
         queryset = Reserve.objects.select_related('doctor').filter(patient=self.patient)
         if self.action == 'retrieve':
-            return queryset.select_related('doctor__province', 'doctor__city')
+            return queryset.select_related('doctor__province', 'doctor__city').prefetch_related('doctor__comments').prefetch_related(
+                   Prefetch('doctor__reserves',
+                            queryset=Reserve.objects.filter(status=Reserve.RESERVE_STATUS_PAID),
+                            to_attr='doctor_reserves')
+                ).prefetch_related(
+                    Prefetch('doctor__specialties',
+                             queryset=DoctorSpecialty.objects.select_related('specialty'))
+                )
         return queryset
     
     def get_serializer_class(self):
@@ -147,3 +156,41 @@ class ReservePatientViewSet(ModelViewSet):
         elif self.action == 'retrieve':
             return serializers.ReservePatientDetailSerializer
         return serializers.ReservePatientSerializer
+
+
+class DoctorViewSet(ModelViewSet):
+    queryset = Doctor.objects.filter(status=Doctor.DOCTOR_STATUS_ACCEPTED).select_related('province', 'city')\
+               .prefetch_related('comments').prefetch_related(
+                   Prefetch('reserves',
+                            queryset=Reserve.objects.filter(status=Reserve.RESERVE_STATUS_PAID),
+                            to_attr='doctor_reserves')
+                ).prefetch_related(
+                    Prefetch('specialties',
+                             queryset=DoctorSpecialty.objects.select_related('specialty'))
+                ).order_by('-confirm_datetime')
+    pagination_class = CustomLimitOffsetPagination
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return serializers.DoctorDetailSerializer
+        elif self.action == 'create':
+            return serializers.DoctorCreateSerializer
+        elif self.action in ['update', 'partial_update']:
+            return serializers.DoctorUpdateSerializer
+        return serializers.DoctorSerializer
+
+    def get_permissions(self):
+        if self.action in ['create', 'destroy']:
+            return [IsAdminUser()]
+        elif self.action in ['update', 'partial_update']:
+            return [IsAdminUserOrDoctorOwner()]
+        return super().get_permissions()
+    
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        if instance.reserves.count() > 0:
+            return Response({'detail': _('There is some reserves relating this doctor, Please remove them first.')}, status=status.HTTP_400_BAD_REQUEST)
+        
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
