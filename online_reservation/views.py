@@ -6,16 +6,15 @@ from rest_framework.decorators import action
 from django.utils.translation import gettext as _
 from django.http import Http404
 from django.db.models import Prefetch
+from django.shortcuts import get_object_or_404
 
 from django_filters.rest_framework import DjangoFilterBackend
 from functools import cached_property
 
-from .models import Doctor, DoctorInsurance, DoctorSpecialty, Insurance, Patient, Province, City, Reserve
+from .models import Doctor, DoctorInsurance, DoctorSpecialty, Insurance, Patient, Province, City, Reserve, Comment
 from . import serializers
 from .paginations import CustomLimitOffsetPagination
 from .filters import PatientFilter, DoctorFilter
-from .permissions import IsAdminUserOrDoctorOwner
-
 
 class ProvinceViewSet(ModelViewSet):
     queryset = Province.objects.order_by('-id')
@@ -99,7 +98,7 @@ class PatientViewSet(ModelViewSet):
     @action(detail=False, methods=['GET', 'PUT'], permission_classes=[IsAuthenticated])
     def me(self, request, *args, **kwargs):
         user = request.user
-        patient = self.queryset.get(id=user.patient.id)
+        patient = get_object_or_404(self.queryset, user_id=user.id)
 
         if request.method == 'GET':
             serializer = serializers.PatientDetailSerializer(patient)
@@ -160,7 +159,7 @@ class ReservePatientViewSet(ModelViewSet):
 
 class DoctorViewSet(ModelViewSet):
     queryset = Doctor.objects.filter(status=Doctor.DOCTOR_STATUS_ACCEPTED).select_related('province', 'city')\
-               .prefetch_related('comments').prefetch_related(
+               .prefetch_related(
                    Prefetch('reserves',
                             queryset=Reserve.objects.filter(status=Reserve.RESERVE_STATUS_PAID),
                             to_attr='doctor_reserves')
@@ -170,6 +169,9 @@ class DoctorViewSet(ModelViewSet):
                 ).prefetch_related(
                     Prefetch('insurances',
                              queryset=DoctorInsurance.objects.select_related('insurance'))
+                ).prefetch_related(
+                    Prefetch('comments',
+                             queryset=Comment.objects.select_related('patient').order_by('-created_datetime'))
                 ).order_by('-confirm_datetime')
     pagination_class = CustomLimitOffsetPagination
     filter_backends = [DjangoFilterBackend]
@@ -185,10 +187,8 @@ class DoctorViewSet(ModelViewSet):
         return serializers.DoctorSerializer
 
     def get_permissions(self):
-        if self.action in ['create', 'destroy']:
+        if self.action in ['create', 'destroy', 'update', 'partial_update']:
             return [IsAdminUser()]
-        elif self.action in ['update', 'partial_update']:
-            return [IsAdminUserOrDoctorOwner()]
         return super().get_permissions()
     
     def destroy(self, request, *args, **kwargs):
@@ -199,3 +199,26 @@ class DoctorViewSet(ModelViewSet):
         
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    @action(detail=False, methods=['GET', 'PUT', 'PATCH', 'DELETE'], permission_classes=[IsAuthenticated])
+    def me(self, request, *args, **kwargs):
+        user = request.user
+        doctor = get_object_or_404(self.queryset, user_id=user.id)
+
+        if request.method == 'GET':
+            serializer = serializers.DoctorDetailSerializer(doctor)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        elif request.method in ['PUT', 'PATCH']:
+            partial = False
+            if request.method == 'PATCH':
+                partial = True
+            serializer = serializers.DoctorUpdateSerializer(doctor, data=request.data,  partial=partial, context=self.get_serializer_context())
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        elif request.method == 'DELETE':
+            if doctor.reserves.count() > 0:
+                return Response({'detail': _('There is some reserves relating to you, Please remove them first.')}, status=status.HTTP_400_BAD_REQUEST)
+            
+            doctor.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)

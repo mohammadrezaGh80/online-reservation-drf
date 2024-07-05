@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from datetime import date, datetime
 
-from .models import Doctor, DoctorSpecialty, Insurance, Patient, Province, City, Reserve, Specialty, DoctorInsurance
+from .models import Doctor, DoctorSpecialty, Insurance, Patient, Province, City, Reserve, Specialty, DoctorInsurance, Comment
 from .validators import NationalCodeValidator
 
 
@@ -179,6 +179,25 @@ class DoctorInsuranceSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorInsurance
         fields = ['id', 'name']
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+    created_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+
+    class Meta:
+        model = Comment
+        fields = ['id', 'name', 'created_datetime', 'rating', 'is_suggest', 'waiting_time', 'body']
+
+    def get_name(self, comment):
+        if comment.is_anonymous:
+            return 'Anonymous user'
+        return comment.patient.first_name
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['waiting_time'] = instance.get_waiting_time_display()
+        return representation
     
 
 class DoctorSerializer(serializers.ModelSerializer):
@@ -237,19 +256,22 @@ class DoctorDetailSerializer(serializers.ModelSerializer):
     city = CitySerializer()
     rating_average = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
+    suggest_percentage = serializers.SerializerMethodField()
+    average_waiting_time = serializers.SerializerMethodField()
     successful_reserve_count = serializers.SerializerMethodField()
     specialties = DoctorSpecialtySerializer(many=True)
     birth_date = serializers.DateField(format='%Y-%m-%d')
     confirm_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
     insurances = DoctorInsuranceSerializer(many=True)
+    comments = CommentSerializer(many=True)
 
     class Meta:
         model = Doctor
         fields = ['id', 'phone', 'first_name', 'last_name', 'gender', 'birth_date',
                   'age', 'email', 'status', 'confirm_datetime', 'rating_average', 
-                  'comment_count', 'successful_reserve_count', 'medical_council_number', 
-                  'specialties', 'national_code', 'insurances', 'province', 'city', 
-                  'office_address', 'bio']
+                  'comment_count', 'suggest_percentage', 'average_waiting_time', 'successful_reserve_count',
+                  'medical_council_number', 'specialties', 'national_code', 'insurances', 
+                  'province', 'city', 'office_address', 'bio', 'comments']
         
     def get_age(self, doctor):
         if doctor.birth_date:
@@ -271,6 +293,20 @@ class DoctorDetailSerializer(serializers.ModelSerializer):
     
     def get_successful_reserve_count(self, doctor):
         return len(doctor.doctor_reserves)
+    
+    def get_suggest_percentage(self, doctor):
+        try:
+            return round((sum([1 for comment in doctor.comments.all() if comment.is_suggest]) / doctor.comments.count()) * 100)
+        except ZeroDivisionError:
+            return None
+    
+    def get_average_waiting_time(self, doctor):
+        waiting_times = [comment.waiting_time for comment in doctor.comments.all()]
+
+        if waiting_times:
+            average_waiting_time = round(sum(waiting_times) / len(waiting_times))
+            return dict(Comment.COMMENT_WAITING_TIME).get(average_waiting_time)
+        return None
     
     def to_representation(self, instance):
         representation = super().to_representation(instance)

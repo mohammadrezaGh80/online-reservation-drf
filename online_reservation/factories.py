@@ -47,7 +47,7 @@ class PatientFactory(DjangoModelFactory):
     last_name = factory.LazyFunction(lambda: fake.last_name())
     birth_date = factory.LazyFunction(lambda: fake.date_time_ad(start_datetime=datetime(1980, 1, 1), end_datetime=datetime(2014, 1, 1)))
     national_code = factory.Sequence(lambda n: "1%09d" % n)
-    email = factory.Sequence(lambda n: "%s%d@gmail.com" %(fake.language_name().replace('-', '').replace(' ', ''), n))
+    email = factory.Sequence(lambda n: "%s%d@gmail.com" %(''.join(fake.language_name().split()), n))
     gender = factory.LazyFunction(lambda: random.choice(models.Person.PERSON_GENDER)[0])
     case_history = factory.LazyFunction(lambda: fake.sentence(nb_words=10, variable_nb_words=True))
 
@@ -70,7 +70,7 @@ class DoctorFactory(DjangoModelFactory):
     last_name = factory.LazyFunction(lambda: fake.last_name())
     birth_date = factory.LazyFunction(lambda: fake.date_time_ad(start_datetime=datetime(1980, 1, 1), end_datetime=datetime(2014, 1, 1)))
     national_code = factory.Sequence(lambda n: "1%09d" % n)
-    email = factory.Sequence(lambda n: "%s%d@gmail.com" %(fake.language_name(), n))
+    email = factory.Sequence(lambda n: "%s%d@gmail.com" %(''.join(fake.language_name().split()), n))
     gender = factory.LazyFunction(lambda: random.choice([models.Person.PERSON_GENDER_MALE, models.Person.PERSON_GENDER_FEMALE])) 
     medical_council_number = factory.Sequence(lambda n: "1%04d" % n)
     status = factory.LazyFunction(lambda:  models.Doctor.DOCTOR_STATUS_ACCEPTED)
