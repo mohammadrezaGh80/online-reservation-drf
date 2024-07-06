@@ -183,7 +183,7 @@ class DoctorSpecialtyAdmin(admin.ModelAdmin):
 
 @admin.register(models.Comment)
 class CommentAdmin(admin.ModelAdmin):
-    list_display = ['patient', 'get_doctor', 'rating', 'is_suggest', 'is_anonymous']
+    list_display = ['patient', 'get_doctor', 'rating', 'is_suggest', 'is_anonymous', 'created_datetime']
     list_per_page = 15
     list_select_related = ['patient', 'doctor']
     autocomplete_fields = ['patient', 'doctor']

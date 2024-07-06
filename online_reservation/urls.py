@@ -20,4 +20,7 @@ provinces_router.register('cities', views.CityViewSet, basename='province-cities
 patients_router = routers.NestedDefaultRouter(router, 'patients', lookup='patient')
 patients_router.register('reserves', views.ReservePatientViewSet, basename='patient-reserves')
 
-urlpatterns = router.urls + provinces_router.urls + patients_router.urls
+doctors_router = routers.NestedDefaultRouter(router, 'doctors', lookup='doctor')
+doctors_router.register('comments', views.CommentViewSet, basename='doctor-comments')
+
+urlpatterns = router.urls + provinces_router.urls + patients_router.urls + doctors_router.urls

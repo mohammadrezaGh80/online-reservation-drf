@@ -15,6 +15,7 @@ from .models import Doctor, DoctorInsurance, DoctorSpecialty, Insurance, Patient
 from . import serializers
 from .paginations import CustomLimitOffsetPagination
 from .filters import PatientFilter, DoctorFilter
+from .permissions import IsDoctor, IsPatientInfoComplete
 
 class ProvinceViewSet(ModelViewSet):
     queryset = Province.objects.order_by('-id')
@@ -122,7 +123,7 @@ class ReservePatientViewSet(ModelViewSet):
             patient = Patient.objects.get(user=self.request.user)
         else:
             try:
-                patient = Patient.objects.get(user_id=patient_pk)
+                patient = Patient.objects.get(id=patient_pk)
             except (Patient.DoesNotExist, ValueError):
                 raise Http404
 
@@ -200,10 +201,10 @@ class DoctorViewSet(ModelViewSet):
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
     
-    @action(detail=False, methods=['GET', 'PUT', 'PATCH', 'DELETE'], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['GET', 'PUT', 'PATCH', 'DELETE'], permission_classes=[IsDoctor])
     def me(self, request, *args, **kwargs):
         user = request.user
-        doctor = get_object_or_404(self.queryset, user_id=user.id)
+        doctor = self.queryset.get(user_id=user.id)
 
         if request.method == 'GET':
             serializer = serializers.DoctorDetailSerializer(doctor)
@@ -222,3 +223,46 @@ class DoctorViewSet(ModelViewSet):
             
             doctor.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CommentViewSet(ModelViewSet):
+    http_method_names = ['get', 'head', 'options', 'post', 'delete']
+
+    def get_permissions(self):
+        doctor_pk = self.kwargs.get('doctor_pk')
+
+        if doctor_pk == 'me':
+            return [IsDoctor()]
+        
+        if self.action == 'create':
+            return [IsAuthenticated(), IsPatientInfoComplete()]
+        elif self.action in ['retrieve', 'destroy']:
+            return [IsAdminUser()]
+        return super().get_permissions()
+
+    @cached_property
+    def doctor(self):
+        doctor_pk = self.kwargs.get('doctor_pk')
+
+        if doctor_pk == 'me':
+            doctor = Doctor.objects.get(user=self.request.user)
+        else:
+            try:
+                doctor = Doctor.objects.get(id=doctor_pk)
+            except (Doctor.DoesNotExist, ValueError):
+                raise Http404
+
+        return doctor
+    
+    def get_queryset(self):
+        if self.action == 'retrieve':
+            return Comment.objects.filter(doctor=self.doctor).select_related('patient__province', 'patient__city').order_by('-created_datetime')
+        return Comment.objects.filter(doctor=self.doctor).select_related('patient').order_by('-created_datetime')
+    
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return serializers.CommentDetailSerializer
+        return serializers.CommentSerializer
+
+    def get_serializer_context(self):
+        return {'request': self.request, 'doctor': self.doctor}

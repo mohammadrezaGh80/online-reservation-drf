@@ -183,16 +183,41 @@ class DoctorInsuranceSerializer(serializers.ModelSerializer):
 
 class CommentSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
-    created_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+    created_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)
 
     class Meta:
         model = Comment
-        fields = ['id', 'name', 'created_datetime', 'rating', 'is_suggest', 'waiting_time', 'body']
+        fields = ['id', 'name', 'created_datetime', 'rating', 'is_suggest', 'waiting_time', 'body', 'is_anonymous']
+        extra_kwargs = {
+            'is_anonymous': {'write_only': True}
+        }
 
     def get_name(self, comment):
         if comment.is_anonymous:
             return 'Anonymous user'
         return comment.patient.first_name
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['waiting_time'] = instance.get_waiting_time_display()
+        return representation
+    
+    def create(self, validated_data):
+        request = self.context.get('request')
+        doctor = self.context.get('doctor')
+
+        validated_data['patient'] = request.user.patient
+        validated_data['doctor'] = doctor
+        return super().create(validated_data)
+
+
+class CommentDetailSerializer(serializers.ModelSerializer):
+    patient = PatientSerializer()
+    created_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+
+    class Meta:
+        model = Comment
+        fields = ['id', 'patient', 'created_datetime', 'rating', 'is_suggest', 'waiting_time', 'body', 'is_anonymous']
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)

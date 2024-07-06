@@ -198,7 +198,7 @@ class Command(BaseCommand):
                     patient_id=patient.id,
                     doctor_id=doctor.id
                 )
-                comment.created_datetime = datetime(year=random.randint(2022, 2024), month=random.randint(1,12),day=random.randint(1,28), tzinfo=timezone.utc)
+                comment.created_datetime = datetime(year=random.randint(2022, 2023), month=random.randint(1,12),day=random.randint(1,28), tzinfo=timezone.utc)
                 comment.save()
 
                 all_comments.append(comment)
