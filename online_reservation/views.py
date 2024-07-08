@@ -14,7 +14,7 @@ from functools import cached_property
 from .models import Doctor, DoctorInsurance, DoctorSpecialty, Insurance, Patient, Province, City, Reserve, Comment
 from . import serializers
 from .paginations import CustomLimitOffsetPagination
-from .filters import PatientFilter, DoctorFilter
+from .filters import PatientFilter, DoctorFilter, CommentListWaitingFilter
 from .permissions import IsDoctor, IsPatientInfoComplete
 
 class ProvinceViewSet(ModelViewSet):
@@ -172,7 +172,7 @@ class DoctorViewSet(ModelViewSet):
                              queryset=DoctorInsurance.objects.select_related('insurance'))
                 ).prefetch_related(
                     Prefetch('comments',
-                             queryset=Comment.objects.select_related('patient').order_by('-created_datetime'))
+                             queryset=Comment.objects.filter(status=Comment.COMMENT_STATUS_APPROVED).select_related('patient').order_by('-created_datetime'))
                 ).order_by('-confirm_datetime')
     pagination_class = CustomLimitOffsetPagination
     filter_backends = [DjangoFilterBackend]
@@ -256,8 +256,8 @@ class CommentViewSet(ModelViewSet):
     
     def get_queryset(self):
         if self.action == 'retrieve':
-            return Comment.objects.filter(doctor=self.doctor).select_related('patient__province', 'patient__city').order_by('-created_datetime')
-        return Comment.objects.filter(doctor=self.doctor).select_related('patient').order_by('-created_datetime')
+            return Comment.objects.filter(doctor=self.doctor, status=Comment.COMMENT_STATUS_APPROVED).select_related('patient__province', 'patient__city').order_by('-created_datetime')
+        return Comment.objects.filter(doctor=self.doctor, status=Comment.COMMENT_STATUS_APPROVED).select_related('patient').order_by('-created_datetime')
     
     def get_serializer_class(self):
         if self.action == 'retrieve':
@@ -266,3 +266,31 @@ class CommentViewSet(ModelViewSet):
 
     def get_serializer_context(self):
         return {'request': self.request, 'doctor': self.doctor}
+
+
+class CommentListWaitingViewSet(ModelViewSet):
+    http_method_names = ['get', 'head', 'options', 'patch']
+    queryset = Comment.objects.filter(status=Comment.COMMENT_STATUS_WAITING).select_related('patient', 'doctor').order_by('-created_datetime')
+    permission_classes = [IsAdminUser]
+    pagination_class = CustomLimitOffsetPagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = CommentListWaitingFilter
+
+    def get_serializer_class(self):
+        if self.action == 'partial_update':
+            return serializers.CommentChangeStatusSerializer
+        elif self.action == 'retrieve':
+            return serializers.CommentListWaitingDetailSerializer
+        return serializers.CommentListWaitingSerializer
+    
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        comment_status = serializer.validated_data.get('status')
+        serializer.save()
+        
+        if comment_status == Comment.COMMENT_STATUS_NOT_APPROVED:
+            instance.delete()        
+        
+        return Response(serializer.data, status=status.HTTP_200_OK)

@@ -13,6 +13,7 @@ router.register('provinces', views.ProvinceViewSet, basename='province')
 router.register('insurances', views.InsuranceViewSet, basename='insurance')
 router.register('patients', views.PatientViewSet, basename='patient')
 router.register('doctors', views.DoctorViewSet, basename='doctor')
+router.register('list-waiting-comments', views.CommentListWaitingViewSet, basename='list-waiting-comments')
 
 provinces_router = routers.NestedDefaultRouter(router, 'provinces', lookup='province')
 provinces_router.register('cities', views.CityViewSet, basename='province-cities')

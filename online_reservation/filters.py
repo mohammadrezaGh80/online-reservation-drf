@@ -4,7 +4,7 @@ from django.shortcuts import get_object_or_404
 import django_filters
 from datetime import date, timedelta
 
-from .models import Province, City, Insurance, Specialty
+from .models import Doctor, Patient, Province, City, Insurance, Specialty
 
 
 class PersonFilter(django_filters.FilterSet):
@@ -85,4 +85,19 @@ class DoctorFilter(PersonFilter):
     def filter_insurance(self, queryset, field_name, value):
         insurance = get_object_or_404(Insurance, pk=value)
         filter_condition = {field_name: insurance}
+        return queryset.filter(**filter_condition)
+
+
+class CommentListWaitingFilter(django_filters.FilterSet):
+    patient = django_filters.NumberFilter(field_name='patient', method='filter_patient', label='patient')
+    doctor = django_filters.NumberFilter(field_name='doctor', method='filter_doctor', label='doctor')
+
+    def filter_patient(self, queryset, field_name, value):
+        patient = get_object_or_404(Patient, pk=value)
+        filter_condition = {field_name: patient}
+        return queryset.filter(**filter_condition)
+
+    def filter_doctor(self, queryset, field_name, value):
+        doctor = get_object_or_404(Doctor, pk=value)
+        filter_condition = {field_name: doctor}
         return queryset.filter(**filter_condition)

@@ -103,6 +103,7 @@ class CommentFactory(DjangoModelFactory):
     waiting_time = factory.LazyFunction(lambda: random.choice(models.Comment.COMMENT_WAITING_TIME)[0])
     is_anonymous = factory.LazyFunction(lambda: fake.boolean())
     body = factory.LazyFunction(lambda: fake.sentence(nb_words=12, variable_nb_words=True))
+    status = factory.LazyFunction(lambda: random.choice([models.Comment.COMMENT_STATUS_APPROVED, models.Comment.COMMENT_STATUS_NOT_APPROVED]))
 
 
 def generate_reserve_datetime():

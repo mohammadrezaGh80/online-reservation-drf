@@ -92,7 +92,8 @@ class PatientAdmin(admin.ModelAdmin):
 
 @admin.register(models.Doctor)
 class DoctorAdmin(admin.ModelAdmin):
-    list_display = ['get_phone', 'email', 'first_name', 'last_name', 'medical_council_number', 'gender', 'status', 'city', 'num_of_specialties', 'num_of_reserves']
+    list_display = ['get_phone', 'email', 'first_name', 'last_name', 'medical_council_number', 'gender', 'status', 'city', 
+                    'num_of_specialties', 'num_of_reserves', 'num_of_comments']
     list_per_page = 15
     list_select_related = ['city', 'user']
     search_fields = ['first_name', 'last_name']
@@ -101,7 +102,7 @@ class DoctorAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         return super().get_queryset(request)\
-               .annotate(specialties_count=Count('specialties', distinct=True), reserves_count=Count('reserves', distinct=True))
+               .annotate(specialties_count=Count('specialties', distinct=True), reserves_count=Count('reserves', distinct=True), comments_count=Count('comments', distinct=True))
 
     @admin.display(description=_('phone'))
     def get_phone(self, patient):
@@ -130,6 +131,18 @@ class DoctorAdmin(admin.ModelAdmin):
         )
 
         return format_html('<a href={}>{}</a>', url, doctor.reserves_count)
+    
+    @admin.display(description=_('# comments'), ordering='comments_count')
+    def num_of_comments(self, doctor):
+        url = (
+            reverse('admin:online_reservation_comment_changelist')
+            + '?'
+            + urlencode({
+                'doctor': doctor.id
+            })
+        )
+
+        return format_html('<a href={}>{}</a>', url, doctor.comments_count)
 
 
 @admin.register(models.Specialty)
@@ -183,11 +196,12 @@ class DoctorSpecialtyAdmin(admin.ModelAdmin):
 
 @admin.register(models.Comment)
 class CommentAdmin(admin.ModelAdmin):
-    list_display = ['patient', 'get_doctor', 'rating', 'is_suggest', 'is_anonymous', 'created_datetime']
+    list_display = ['patient', 'get_doctor', 'status', 'rating', 'is_suggest', 'is_anonymous', 'created_datetime']
     list_per_page = 15
     list_select_related = ['patient', 'doctor']
     autocomplete_fields = ['patient', 'doctor']
     ordering = ['-created_datetime']
+    list_editable = ['status']
 
     @admin.display(description=_('doctor'))
     def get_doctor(self, comment):

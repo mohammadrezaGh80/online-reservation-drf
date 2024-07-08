@@ -537,3 +537,59 @@ class ReservePatientUpdateSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         representation['status'] = instance.get_status_display()
         return representation
+
+
+class CommentListWaitingPatientSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Patient
+        fields = ['id', 'first_name', 'last_name']
+
+
+class CommentListWaitingDoctorSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Doctor
+        fields = ['id', 'first_name', 'last_name']
+
+
+class CommentListWaitingSerializer(serializers.ModelSerializer):
+    patient = CommentListWaitingPatientSerializer()
+    doctor = CommentListWaitingDoctorSerializer()
+    created_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+
+    class Meta:
+        model = Comment
+        fields = ['id', 'patient', 'doctor', 'rating', 'is_suggest', 'waiting_time', 'is_anonymous', 'created_datetime']
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['waiting_time'] = instance.get_waiting_time_display()
+        return representation
+
+
+class CommentListWaitingDetailSerializer(serializers.ModelSerializer):
+    patient = CommentListWaitingPatientSerializer()
+    doctor = CommentListWaitingDoctorSerializer()
+    created_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+
+    class Meta:
+        model = Comment
+        fields = ['id', 'patient', 'doctor', 'rating', 'is_suggest', 'waiting_time', 'is_anonymous', 'created_datetime', 'body']
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['waiting_time'] = instance.get_waiting_time_display()
+        return representation
+
+
+class CommentChangeStatusSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Comment
+        fields = ['status']
+    
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['status'] = instance.get_status_display()
+        return representation

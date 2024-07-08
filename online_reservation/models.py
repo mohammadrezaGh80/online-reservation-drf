@@ -238,6 +238,16 @@ class Comment(models.Model):
         (COMMENT_WAITING_TIME_MORE_THAN_90_MINUTES, _('More than 90 minutes'))
     ]
 
+    COMMENT_STATUS_WAITING = 'w'
+    COMMENT_STATUS_APPROVED = 'a'
+    COMMENT_STATUS_NOT_APPROVED = 'na'
+
+    COMMENT_STATUS = [
+        (COMMENT_STATUS_WAITING, _('Waiting')),
+        (COMMENT_STATUS_APPROVED, _('Approved')),
+        (COMMENT_STATUS_NOT_APPROVED, _('Not approved'))
+    ]
+
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='comments', verbose_name=_('Patient'))
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='comments', verbose_name=_('Doctor'))
     rating = models.IntegerField(choices=COMMENT_RATING, verbose_name=_('Rating'))
@@ -245,6 +255,7 @@ class Comment(models.Model):
     waiting_time = models.IntegerField(choices=COMMENT_WAITING_TIME, verbose_name=_('Waiting time'))
     is_anonymous = models.BooleanField(default=False, verbose_name=_('Is anonymous')) # if True, should show Unknown instead of name
     body = models.TextField(verbose_name=_('Body'))
+    status = models.CharField(max_length=2, choices=COMMENT_STATUS, default=COMMENT_STATUS_WAITING, verbose_name=_('Status'))
 
     created_datetime = models.DateTimeField(auto_now_add=True, verbose_name=_('Created datetime'))
 
@@ -269,7 +280,7 @@ class Reserve(models.Model):
     patient = models.ForeignKey(Patient, blank=True, null=True, on_delete=models.PROTECT, related_name='reserves', verbose_name=_('Patient')) # TODO: patient can cancel reserve for 20 minutes
     status = models.CharField(max_length=1, choices=RESERVE_STATUS, default=RESERVE_STATUS_UNPAID, verbose_name=_('Status')) # TODO: after 20 minutes delete patient's reserve
     price = models.PositiveIntegerField(verbose_name=_('Price'))
-    reserve_datetime = models.DateTimeField(verbose_name=_('Reserve datetime')) # TODO: in same day and time, doctor can't add more than one reserve && if reserve_datetime has passed delete it reserve
+    reserve_datetime = models.DateTimeField(unique=True, verbose_name=_('Reserve datetime')) # TODO: in same day and time, doctor can't add more than one reserve && if reserve_datetime has passed delete it reserve
 
     def __str__(self):
         return f'{self.patient}(Doctor: {self.doctor.first_name}): {self.reserve_datetime}' # TODO: if not exist patient, show proper str
