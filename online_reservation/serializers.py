@@ -3,10 +3,13 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from rest_framework import serializers
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone, timedelta
 
 from .models import Doctor, DoctorSpecialty, Insurance, Patient, Province, City, Reserve, Specialty, DoctorInsurance, Comment
 from .validators import NationalCodeValidator
+
+
+TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
 
 
 class ProvinceSerializer(serializers.ModelSerializer):
@@ -394,7 +397,7 @@ class DoctorCreateSerializer(serializers.ModelSerializer):
             for specialty in specialties_list:
                 if DoctorSpecialty.objects.filter(doctor=doctor, specialty=specialty).exists():
                     raise serializers.ValidationError(
-                        {'detail': _('The doctor %(doctor_full_name)s has already the specialty %(specialty_name)s') % {'doctor_full_name': doctor.full_name, 'specialty_name': specialty.name}}
+                        {'detail': _('The doctor %(doctor_full_name)s has already the specialty %(specialty_name)s.') % {'doctor_full_name': doctor.full_name, 'specialty_name': specialty.name}}
                     )
                 DoctorSpecialty.objects.create(
                     specialty=specialty,
@@ -404,7 +407,7 @@ class DoctorCreateSerializer(serializers.ModelSerializer):
             for insurance in insurances_list:
                 if DoctorInsurance.objects.filter(doctor=doctor, insurance=insurance).exists():
                     raise serializers.ValidationError(
-                        {'detail': _('The doctor %(doctor_full_name)s has already covers %(insurance_name)s insurance') % {'doctor_full_name': doctor.full_name, 'insurance_name': insurance.name}}
+                        {'detail': _('The doctor %(doctor_full_name)s has already covers %(insurance_name)s insurance.') % {'doctor_full_name': doctor.full_name, 'insurance_name': insurance.name}}
                     )
                 DoctorInsurance.objects.create(
                     insurance=insurance,
@@ -470,7 +473,7 @@ class DoctorUpdateSerializer(serializers.ModelSerializer):
                 for specialty in specialties_list:
                     if DoctorSpecialty.objects.filter(doctor=instance, specialty=specialty).exists():
                         raise serializers.ValidationError(
-                            {'detail': _('The doctor %(doctor_full_name)s has already the specialty %(specialty_name)s') % {'doctor_full_name': instance.full_name, 'specialty_name': specialty.name}}
+                            {'detail': _('The doctor %(doctor_full_name)s has already the specialty %(specialty_name)s.') % {'doctor_full_name': instance.full_name, 'specialty_name': specialty.name}}
                         )
                     DoctorSpecialty.objects.create(
                         specialty=specialty,
@@ -482,7 +485,7 @@ class DoctorUpdateSerializer(serializers.ModelSerializer):
                 for insurance in insurances_list:
                     if DoctorInsurance.objects.filter(doctor=instance, insurance=insurance).exists():
                         raise serializers.ValidationError(
-                            {'detail': _('The doctor %(doctor_full_name)s has already covers %(insurance_name)s insurance') % {'doctor_full_name': instance.full_name, 'insurance_name': insurance.name}}
+                            {'detail': _('The doctor %(doctor_full_name)s has already covers %(insurance_name)s insurance.') % {'doctor_full_name': instance.full_name, 'insurance_name': insurance.name}}
                         )
                     DoctorInsurance.objects.create(
                         insurance=insurance,
@@ -500,11 +503,14 @@ class DoctorUpdateSerializer(serializers.ModelSerializer):
 class ReservePatientSerializer(serializers.ModelSerializer):
     doctor = serializers.CharField(source='doctor.full_name')
     reserve_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+    is_expired = serializers.SerializerMethodField()
 
     class Meta:
         model = Reserve
-        fields = ['id', 'doctor', 'status', 'price', 'reserve_datetime']
-        read_only_fields = ['status']
+        fields = ['id', 'doctor', 'status', 'price', 'reserve_datetime', 'is_expired']
+    
+    def get_is_expired(self, reserve):
+        return True if reserve.reserve_datetime < datetime.now(tz=timezone.utc) else False
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -515,11 +521,14 @@ class ReservePatientSerializer(serializers.ModelSerializer):
 class ReservePatientDetailSerializer(serializers.ModelSerializer):
     doctor = DoctorSerializer()
     reserve_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+    is_expired = serializers.SerializerMethodField()
 
     class Meta:
         model = Reserve
-        fields = ['id', 'doctor', 'status', 'price', 'reserve_datetime']
-        read_only_fields = ['status']
+        fields = ['id', 'doctor', 'status', 'price', 'reserve_datetime', 'is_expired']
+    
+    def get_is_expired(self, reserve):
+        return True if reserve.reserve_datetime < datetime.now(tz=timezone.utc) else False
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -593,3 +602,65 @@ class CommentChangeStatusSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         representation['status'] = instance.get_status_display()
         return representation
+
+
+class ReserveDoctorSerializer(serializers.ModelSerializer):
+    patient = serializers.SerializerMethodField()
+    reserve_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+    is_expired = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Reserve
+        fields = ['id', 'patient', 'status', 'price', 'reserve_datetime', 'is_expired']
+    
+    def get_patient(self, reserve):
+        if reserve.patient:
+            return reserve.patient.full_name
+        return None
+    
+    def get_is_expired(self, reserve):
+        return True if reserve.reserve_datetime < datetime.now(tz=timezone.utc) else False
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['status'] = instance.get_status_display()
+        return representation
+
+
+class ReserveDoctorDetailSerializer(serializers.ModelSerializer):
+    patient = PatientSerializer()
+    reserve_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+    is_expired = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Reserve
+        fields = ['id', 'patient', 'status', 'price', 'reserve_datetime', 'is_expired']
+
+    def get_is_expired(self, reserve):
+        return True if reserve.reserve_datetime < datetime.now(tz=timezone.utc) else False
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['status'] = instance.get_status_display()
+        return representation
+
+
+class ReserveDoctorCreateSerializer(serializers.ModelSerializer):
+    reserve_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+
+    class Meta:
+        model = Reserve
+        fields = ['id', 'price', 'reserve_datetime']
+    
+    def validate_reserve_datetime(self, reserve_datetime):
+        new_datetime = datetime.now(tz=TEHRAN_TZ) + timedelta(minutes=5)
+        rounded_current_datetime = new_datetime.replace(second=0, microsecond=0)
+
+        if rounded_current_datetime >= reserve_datetime:
+            raise serializers.ValidationError('The reserve datetime cannot be before %(rounded_current_datetime)s.' % {'rounded_current_datetime': rounded_current_datetime.strftime('%Y-%m-%d %H:%M:%S')})
+        return reserve_datetime
+    
+    def create(self, validated_data):
+        doctor = self.context.get('doctor')
+        validated_data['doctor'] = doctor
+        return super().create(validated_data)

@@ -5,9 +5,12 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.http import urlencode
 from django.utils.html import format_html
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from . import models
+
+
+TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
 
 
 @admin.register(models.Province)
@@ -196,7 +199,7 @@ class DoctorSpecialtyAdmin(admin.ModelAdmin):
 
 @admin.register(models.Comment)
 class CommentAdmin(admin.ModelAdmin):
-    list_display = ['patient', 'get_doctor', 'status', 'rating', 'is_suggest', 'is_anonymous', 'created_datetime']
+    list_display = ['patient', 'get_doctor', 'status', 'rating', 'is_suggest', 'is_anonymous', 'get_created_datetime']
     list_per_page = 15
     list_select_related = ['patient', 'doctor']
     autocomplete_fields = ['patient', 'doctor']
@@ -206,6 +209,11 @@ class CommentAdmin(admin.ModelAdmin):
     @admin.display(description=_('doctor'))
     def get_doctor(self, comment):
         return comment.doctor.full_name
+    
+    @admin.display(description=_('created_datetime'), ordering='created_datetime')
+    def get_created_datetime(self, comment):
+        tehran_time = comment.created_datetime.astimezone(TEHRAN_TZ)
+        return tehran_time.strftime('%Y-%m-%d %H:%M:%S')
 
 
 @admin.register(models.Reserve)
@@ -222,8 +230,9 @@ class ReserveAdmin(admin.ModelAdmin):
     
     @admin.display(description=_('reserve_datetime'), ordering='reserve_datetime')
     def get_reserve_datetime(self, reserve):
-        return reserve.reserve_datetime.strftime('%Y-%m-%d %H:%M:%S')
+        tehran_time = reserve.reserve_datetime.astimezone(TEHRAN_TZ)
+        return tehran_time.strftime('%Y-%m-%d %H:%M:%S')
     
     @admin.display(description=_('is_expired'))
     def is_expired(self, reserve):
-        return True if reserve.reserve_datetime < datetime.now(timezone.utc) else False
+        return True if reserve.reserve_datetime < datetime.now(tz=timezone.utc) else False

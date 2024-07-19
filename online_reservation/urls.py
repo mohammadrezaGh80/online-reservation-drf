@@ -23,5 +23,6 @@ patients_router.register('reserves', views.ReservePatientViewSet, basename='pati
 
 doctors_router = routers.NestedDefaultRouter(router, 'doctors', lookup='doctor')
 doctors_router.register('comments', views.CommentViewSet, basename='doctor-comments')
+doctors_router.register('reserves', views.ReserveDoctorViewSet, basename='doctor-reserves')
 
 urlpatterns = router.urls + provinces_router.urls + patients_router.urls + doctors_router.urls

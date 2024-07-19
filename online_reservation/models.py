@@ -92,8 +92,12 @@ class Patient(Person):
 
         if not self.national_code and not self.is_foreign_national:
             raise ValidationError(_('national_code field may not be blank.'))
-
-        if self.city and self.province and not City.objects.filter(id=self.city.id, province_id=self.province.id).exists():
+        
+        if self.province and not self.city:
+            raise ValidationError(_('city field is required.'))
+        elif not self.province and self.city:
+            raise ValidationError(_('province field is required.'))
+        elif self.city and self.province and not City.objects.filter(id=self.city.id, province_id=self.province.id).exists():
             raise ValidationError(_("There isn't %(city_name)s city in %(province_name)s province.") % {'city_name': self.city.name, 'province_name': self.province.name})
 
     def save(self, *args, **kwargs):
@@ -149,7 +153,11 @@ class Doctor(Person):
     def clean(self):
         super().clean()
 
-        if self.city and self.province and not City.objects.filter(id=self.city.id, province_id=self.province.id).exists():
+        if self.province and not self.city:
+            raise ValidationError(_('city field is required.'))
+        elif not self.province and self.city:
+            raise ValidationError(_('province field is required.'))
+        elif self.city and self.province and not City.objects.filter(id=self.city.id, province_id=self.province.id).exists():
             raise ValidationError(_("There isn't %(city_name)s city in %(province_name)s province.") % {'city_name': self.city.name, 'province_name': self.province.name})
 
     def __str__(self):

@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from django.utils.translation import gettext as _
 from django.http import Http404
 from django.db.models import Prefetch
@@ -15,7 +16,7 @@ from .models import Doctor, DoctorInsurance, DoctorSpecialty, Insurance, Patient
 from . import serializers
 from .paginations import CustomLimitOffsetPagination
 from .filters import PatientFilter, DoctorFilter, CommentListWaitingFilter
-from .permissions import IsDoctor, IsPatientInfoComplete
+from .permissions import IsDoctor, IsPatientInfoComplete, IsDoctorOfficeAddressInfoComplete, IsDoctorOfficeAddressInfoCompleteForAdmin
 
 class ProvinceViewSet(ModelViewSet):
     queryset = Province.objects.order_by('-id')
@@ -138,7 +139,7 @@ class ReservePatientViewSet(ModelViewSet):
             return [IsAdminUser()]
     
     def get_queryset(self):
-        queryset = Reserve.objects.select_related('doctor').filter(patient=self.patient)
+        queryset = Reserve.objects.select_related('doctor').filter(patient=self.patient).order_by('-reserve_datetime')
         if self.action == 'retrieve':
             return queryset.select_related('doctor__province', 'doctor__city').prefetch_related('doctor__comments').prefetch_related(
                    Prefetch('doctor__reserves',
@@ -232,6 +233,8 @@ class CommentViewSet(ModelViewSet):
         doctor_pk = self.kwargs.get('doctor_pk')
 
         if doctor_pk == 'me':
+            if self.action == 'create':
+                raise PermissionDenied(detail=_('You do not have permission to create a comment for yourself.'))
             return [IsDoctor()]
         
         if self.action == 'create':
@@ -294,3 +297,50 @@ class CommentListWaitingViewSet(ModelViewSet):
             instance.delete()        
         
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ReserveDoctorViewSet(ModelViewSet):
+    http_method_names = ['get', 'head', 'options', 'post', 'delete']
+    serializer_class = serializers.ReserveDoctorSerializer
+    pagination_class = CustomLimitOffsetPagination
+
+    @cached_property
+    def doctor(self):
+        doctor_pk = self.kwargs.get('doctor_pk')
+
+        if doctor_pk == 'me':
+            doctor = Doctor.objects.get(user=self.request.user)
+        else:
+            try:
+                doctor = Doctor.objects.get(id=doctor_pk)
+            except (Doctor.DoesNotExist, ValueError):
+                raise Http404
+
+        return doctor
+    
+    def get_queryset(self):
+        if self.action == 'retrieve':
+            return Reserve.objects.filter(doctor=self.doctor).select_related('patient__province', 'patient__city', 'patient__insurance').order_by('-reserve_datetime')
+        return Reserve.objects.filter(doctor=self.doctor).select_related('patient').order_by('-reserve_datetime')
+    
+    def get_permissions(self):
+        doctor_pk = self.kwargs.get('doctor_pk')
+
+        if doctor_pk == 'me':
+            if self.action == 'create':
+                return [IsDoctor(), IsDoctorOfficeAddressInfoComplete()]
+            return [IsDoctor()]
+        else:
+            if self.action == 'create':
+                return [IsAdminUser(), IsDoctorOfficeAddressInfoCompleteForAdmin()]
+            return [IsAdminUser()]
+        
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return serializers.ReserveDoctorDetailSerializer
+        elif self.action == 'create':
+            return serializers.ReserveDoctorCreateSerializer
+        return serializers.ReserveDoctorSerializer
+    
+    def get_serializer_context(self):
+        return {'doctor': self.doctor}
