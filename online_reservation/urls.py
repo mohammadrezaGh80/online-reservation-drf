@@ -11,6 +11,7 @@ app_name = 'online_reservation'
 router = DefaultRouter()
 router.register('provinces', views.ProvinceViewSet, basename='province')
 router.register('insurances', views.InsuranceViewSet, basename='insurance')
+router.register('specialties', views.SpecialtyViewSet, basename='specialty')
 router.register('patients', views.PatientViewSet, basename='patient')
 router.register('doctors', views.DoctorViewSet, basename='doctor')
 router.register('list-waiting-comments', views.CommentListWaitingViewSet, basename='list-waiting-comments')

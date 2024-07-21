@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from functools import cached_property
 
-from .models import Doctor, DoctorInsurance, DoctorSpecialty, Insurance, Patient, Province, City, Reserve, Comment
+from .models import Doctor, DoctorInsurance, DoctorSpecialty, Insurance, Patient, Province, City, Reserve, Comment, Specialty
 from . import serializers
 from .paginations import CustomLimitOffsetPagination
 from .filters import PatientFilter, DoctorFilter, CommentListWaitingFilter, ReserveDoctorFilter
@@ -80,6 +80,17 @@ class InsuranceViewSet(ModelViewSet):
 
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SpecialtyViewSet(ModelViewSet):
+    queryset = Specialty.objects.all().order_by('-id')
+    permission_classes = [IsAdminUser]
+    pagination_class = CustomLimitOffsetPagination
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return serializers.SpecialtyDetailSerializer
+        return serializers.SpecialtySerializer
 
 
 class PatientViewSet(ModelViewSet):

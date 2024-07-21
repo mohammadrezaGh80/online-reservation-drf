@@ -1,6 +1,7 @@
 from django.utils.translation import gettext as _
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Prefetch
 from rest_framework import serializers
 
 from datetime import date, datetime, timezone, timedelta
@@ -59,14 +60,32 @@ class InsuranceSerializer(serializers.ModelSerializer):
 
 
 class InsuranceDetailSerializer(serializers.ModelSerializer):
-    patients_count = serializers.SerializerMethodField()
+    patient_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Insurance
-        fields = ['id', 'name', 'patients_count']
+        fields = ['id', 'name', 'patient_count']
 
-    def get_patients_count(self, insurance):
+    def get_patient_count(self, insurance):
         return insurance.patients.count()
+    
+
+class SpecialtySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Specialty
+        fields = ['id', 'name']
+
+
+class SpecialtyDetailSerializer(serializers.ModelSerializer):
+    doctor_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Insurance
+        fields = ['id', 'name', 'doctor_count']
+
+    def get_doctor_count(self, specialty):
+        return specialty.doctors.count()
 
 
 class PatientSerializer(serializers.ModelSerializer):
@@ -277,36 +296,19 @@ class DoctorSerializer(serializers.ModelSerializer):
         return representation
     
 
-class DoctorDetailSerializer(serializers.ModelSerializer):
-    phone = serializers.CharField(source='user.phone', read_only=True)
-    age = serializers.SerializerMethodField()
-    province = ProvinceSerializer()
-    city = CitySerializer()
-    rating_average = serializers.SerializerMethodField()
-    comment_count = serializers.SerializerMethodField()
-    suggest_percentage = serializers.SerializerMethodField()
-    average_waiting_time = serializers.SerializerMethodField()
-    successful_reserve_count = serializers.SerializerMethodField()
+class DoctorAlternativeSerializer(serializers.ModelSerializer):
     specialties = DoctorSpecialtySerializer(many=True)
-    birth_date = serializers.DateField(format='%Y-%m-%d')
-    confirm_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
-    insurances = DoctorInsuranceSerializer(many=True)
-    comments = CommentSerializer(many=True)
+    city = CitySerializer()
+    comment_rating_average = serializers.SerializerMethodField()
+    comment_count = serializers.SerializerMethodField()
+    successful_reserve_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Doctor
-        fields = ['id', 'phone', 'first_name', 'last_name', 'gender', 'birth_date',
-                  'age', 'email', 'status', 'confirm_datetime', 'rating_average', 
-                  'comment_count', 'suggest_percentage', 'average_waiting_time', 'successful_reserve_count',
-                  'medical_council_number', 'specialties', 'national_code', 'insurances', 
-                  'province', 'city', 'office_address', 'bio', 'comments']
-        
-    def get_age(self, doctor):
-        if doctor.birth_date:
-            return (date.today() - doctor.birth_date).days // 365
-        return None
+        fields = ['id', 'first_name', 'last_name', 'city', 'specialties',
+                  'comment_rating_average', 'comment_count', 'successful_reserve_count']
     
-    def get_rating_average(self, doctor):
+    def get_comment_rating_average(self, doctor):
         try:
             rating_average = round(sum([comment.rating for comment in doctor.comments.all()]) / doctor.comments.count(), 1)
             
@@ -319,6 +321,53 @@ class DoctorDetailSerializer(serializers.ModelSerializer):
     def get_comment_count(self, doctor):
         return doctor.comments.count()
     
+    def get_successful_reserve_count(self, doctor):
+        return len(doctor.doctor_reserves)
+    
+
+class DoctorDetailSerializer(serializers.ModelSerializer):
+    phone = serializers.CharField(source='user.phone', read_only=True)
+    age = serializers.SerializerMethodField()
+    province = ProvinceSerializer()
+    city = CitySerializer()
+    comment_rating_average = serializers.SerializerMethodField()
+    comment_count = serializers.SerializerMethodField()
+    suggest_percentage = serializers.SerializerMethodField()
+    average_waiting_time = serializers.SerializerMethodField()
+    successful_reserve_count = serializers.SerializerMethodField()
+    specialties = DoctorSpecialtySerializer(many=True)
+    birth_date = serializers.DateField(format='%Y-%m-%d')
+    confirm_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+    insurances = DoctorInsuranceSerializer(many=True)
+    comments = CommentSerializer(many=True)
+    alternative_doctors = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Doctor
+        fields = ['id', 'phone', 'first_name', 'last_name', 'gender', 'birth_date',
+                  'age', 'email', 'status', 'confirm_datetime', 'comment_rating_average', 
+                  'comment_count', 'suggest_percentage', 'average_waiting_time', 'successful_reserve_count',
+                  'medical_council_number', 'specialties', 'national_code', 'insurances', 
+                  'province', 'city', 'office_address', 'bio', 'alternative_doctors', 'comments']
+        
+    def get_age(self, doctor):
+        if doctor.birth_date:
+            return (date.today() - doctor.birth_date).days // 365
+        return None
+
+    def get_comment_rating_average(self, doctor):
+        try:
+            rating_average = round(sum([comment.rating for comment in doctor.comments.all()]) / doctor.comments.count(), 1)
+            
+            if rating_average == int(rating_average):
+                return int(rating_average)
+            return rating_average
+        except ZeroDivisionError:
+            return None
+
+    def get_comment_count(self, doctor):
+        return doctor.comments.count()
+
     def get_successful_reserve_count(self, doctor):
         return len(doctor.doctor_reserves)
     
@@ -335,6 +384,29 @@ class DoctorDetailSerializer(serializers.ModelSerializer):
             average_waiting_time = round(sum(waiting_times) / len(waiting_times))
             return dict(Comment.COMMENT_WAITING_TIME).get(average_waiting_time)
         return None
+    
+    def get_alternative_doctors(self, doctor):
+        if Reserve.objects.filter(doctor=doctor, reserve_datetime__gte=datetime.now(tz=TEHRAN_TZ)).exists():
+            return []
+        
+        queryset = Doctor.objects.prefetch_related(
+                Prefetch('specialties',
+                             queryset=DoctorSpecialty.objects.select_related('specialty'))
+                ).prefetch_related(
+                   Prefetch('reserves',
+                            queryset=Reserve.objects.filter(status=Reserve.RESERVE_STATUS_PAID),
+                            to_attr='doctor_reserves')
+                ).prefetch_related(
+                    Prefetch('comments',
+                             queryset=Comment.objects.filter(status=Comment.COMMENT_STATUS_APPROVED).select_related('patient').order_by('-created_datetime'))
+                ).filter(
+                    specialties__specialty_id__in=doctor.specialties.values_list('specialty__id', flat=True), 
+                    city=doctor.city,
+                    reserves__reserve_datetime__gte=datetime.now(tz=TEHRAN_TZ),
+                    reserves__status=Reserve.RESERVE_STATUS_UNPAID).\
+                exclude(id=doctor.id).distinct()[:5]
+        
+        return DoctorAlternativeSerializer(queryset, many=True).data
     
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -391,7 +463,7 @@ class DoctorCreateSerializer(serializers.ModelSerializer):
             doctor = Doctor.objects.create(
                 **validated_data,
                 status=Doctor.DOCTOR_STATUS_ACCEPTED,
-                confirm_datetime=datetime.now()
+                confirm_datetime=datetime.now(tz=TEHRAN_TZ)
             )
 
             for specialty in specialties_list:
