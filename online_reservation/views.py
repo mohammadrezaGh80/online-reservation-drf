@@ -15,7 +15,7 @@ from functools import cached_property
 from .models import Doctor, DoctorInsurance, DoctorSpecialty, Insurance, Patient, Province, City, Reserve, Comment
 from . import serializers
 from .paginations import CustomLimitOffsetPagination
-from .filters import PatientFilter, DoctorFilter, CommentListWaitingFilter
+from .filters import PatientFilter, DoctorFilter, CommentListWaitingFilter, ReserveDoctorFilter
 from .permissions import IsDoctor, IsPatientInfoComplete, IsDoctorOfficeAddressInfoComplete, IsDoctorOfficeAddressInfoCompleteForAdmin
 
 class ProvinceViewSet(ModelViewSet):
@@ -301,8 +301,9 @@ class CommentListWaitingViewSet(ModelViewSet):
 
 class ReserveDoctorViewSet(ModelViewSet):
     http_method_names = ['get', 'head', 'options', 'post', 'delete']
-    serializer_class = serializers.ReserveDoctorSerializer
     pagination_class = CustomLimitOffsetPagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = ReserveDoctorFilter
 
     @cached_property
     def doctor(self):

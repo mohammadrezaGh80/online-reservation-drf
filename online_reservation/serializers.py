@@ -606,7 +606,7 @@ class CommentChangeStatusSerializer(serializers.ModelSerializer):
 
 class ReserveDoctorSerializer(serializers.ModelSerializer):
     patient = serializers.SerializerMethodField()
-    reserve_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+    reserve_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M')
     is_expired = serializers.SerializerMethodField()
 
     class Meta:
@@ -629,7 +629,7 @@ class ReserveDoctorSerializer(serializers.ModelSerializer):
 
 class ReserveDoctorDetailSerializer(serializers.ModelSerializer):
     patient = PatientSerializer()
-    reserve_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+    reserve_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M')
     is_expired = serializers.SerializerMethodField()
 
     class Meta:
@@ -646,7 +646,7 @@ class ReserveDoctorDetailSerializer(serializers.ModelSerializer):
 
 
 class ReserveDoctorCreateSerializer(serializers.ModelSerializer):
-    reserve_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+    reserve_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M')
 
     class Meta:
         model = Reserve
@@ -658,7 +658,18 @@ class ReserveDoctorCreateSerializer(serializers.ModelSerializer):
 
         if rounded_current_datetime >= reserve_datetime:
             raise serializers.ValidationError('The reserve datetime cannot be before %(rounded_current_datetime)s.' % {'rounded_current_datetime': rounded_current_datetime.strftime('%Y-%m-%d %H:%M:%S')})
-        return reserve_datetime
+        return reserve_datetime.replace(second=0, microsecond=0)
+    
+    def validate(self, attrs):
+        doctor = self.context.get('doctor')
+        reserve_datetime = attrs.get('reserve_datetime')
+
+        if Reserve.objects.filter(doctor=doctor, reserve_datetime=reserve_datetime).exists():
+            raise serializers.ValidationError(
+                {'detail': _("A doctor can't have two or more reserves at the same time(%(reserve_datetime)s)." % {'reserve_datetime': reserve_datetime.strftime('%Y-%m-%d %H:%M')})}
+            )
+
+        return super().validate(attrs)
     
     def create(self, validated_data):
         doctor = self.context.get('doctor')

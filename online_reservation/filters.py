@@ -2,9 +2,9 @@ from django.utils.translation import gettext_lazy as _
 from django.shortcuts import get_object_or_404
 
 import django_filters
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 
-from .models import Doctor, Patient, Province, City, Insurance, Specialty
+from .models import Doctor, Patient, Province, City, Insurance, Specialty, Reserve
 
 
 class PersonFilter(django_filters.FilterSet):
@@ -101,3 +101,21 @@ class CommentListWaitingFilter(django_filters.FilterSet):
         doctor = get_object_or_404(Doctor, pk=value)
         filter_condition = {field_name: doctor}
         return queryset.filter(**filter_condition)
+
+
+class ReserveDoctorFilter(django_filters.FilterSet):
+    is_expired = django_filters.BooleanFilter(field_name='reserve_datetime', method='filter_is_expired', label='is_expired')
+    year = django_filters.NumberFilter(field_name='reserve_datetime', lookup_expr='year', label='year')
+    month = django_filters.NumberFilter(field_name='reserve_datetime', lookup_expr='month', label='month')
+    day = django_filters.NumberFilter(field_name='reserve_datetime', lookup_expr='day', label='day')
+
+    def filter_is_expired(self, queryset, field_name, value):
+        if value:
+            filter_condition = {f'{field_name}__lt': datetime.now()}
+        else:
+            filter_condition = {f'{field_name}__gte': datetime.now()}
+        return queryset.filter(**filter_condition)
+
+    class Meta:
+        model = Reserve
+        fields = ['status', 'is_expired', 'year', 'month', 'day']
