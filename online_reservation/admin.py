@@ -46,9 +46,38 @@ class CityAdmin(admin.ModelAdmin):
 
 @admin.register(models.Insurance)
 class InsuranceAdmin(admin.ModelAdmin):
-    list_display = ['name']
+    list_display = ['name', 'num_of_doctors', 'num_of_patients']
     list_per_page = 15
     search_fields = ['name']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(
+            doctors_count=Count('doctors', distinct=True), patients_count=Count('patients', distinct=True)
+        )
+    
+    @admin.display(description=_('# doctors'), ordering='doctors_count')
+    def num_of_doctors(self, insurance):
+        url = (
+            reverse('admin:online_reservation_doctorinsurance_changelist')
+            + '?'
+            + urlencode({
+                'insurance': insurance.id
+            })
+        )
+
+        return format_html('<a href={}>{}</a>', url, insurance.doctors_count)
+    
+    @admin.display(description=_('# patients'), ordering='patients_count')
+    def num_of_patients(self, insurance):
+        url = (
+            reverse('admin:online_reservation_patient_changelist')
+            + '?'
+            + urlencode({
+                'insurance': insurance.id
+            })
+        )
+
+        return format_html('<a href={}>{}</a>', url, insurance.patients_count)
 
 
 @admin.register(models.Patient)

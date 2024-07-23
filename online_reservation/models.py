@@ -292,6 +292,10 @@ class Reserve(models.Model):
 
     def __str__(self):
         return f'{self.patient}(Doctor: {self.doctor.first_name}): {self.reserve_datetime}' # TODO: if not exist patient, show proper str
+    
+    def save(self, *args, **kwargs):
+        self.reserve_datetime = self.reserve_datetime.replace(second=0, microsecond=0)
+        return super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = _('Reserve')
