@@ -257,13 +257,15 @@ class DoctorSerializer(serializers.ModelSerializer):
     specialties = DoctorSpecialtySerializer(many=True)
     confirm_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
     is_cover_insurance = serializers.SerializerMethodField()
+    first_free_reserve_datetime = serializers.SerializerMethodField()
 
     class Meta:
         model = Doctor
         fields = ['id', 'first_name', 'last_name', 'gender', 'age', 'status', 
                   'confirm_datetime', 'rating_average', 'comment_count', 
                   'successful_reserve_count', 'medical_council_number', 'specialties',
-                  'is_cover_insurance', 'province', 'city', 'office_address']
+                  'first_free_reserve_datetime', 'is_cover_insurance', 'province', 'city', 
+                  'office_address']
         
     def get_age(self, doctor):
         if doctor.birth_date:
@@ -288,6 +290,20 @@ class DoctorSerializer(serializers.ModelSerializer):
     
     def get_is_cover_insurance(self, doctor):
         return bool(doctor.insurances.count())
+    
+    def get_first_free_reserve_datetime(self, doctor):
+        free_reserves = doctor.doctor_free_reserves
+
+        if free_reserves:
+            today_date = date.today()
+            first_free_reserve_date = free_reserves[0].reserve_datetime.date()
+
+            if today_date == first_free_reserve_date:
+                return _('Today')
+            elif today_date + timedelta(days=1) == first_free_reserve_date:
+                return _('Tomorrow')
+            return first_free_reserve_date
+        return None
     
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -326,7 +342,7 @@ class DoctorAlternativeSerializer(serializers.ModelSerializer):
         return len(doctor.doctor_reserves)
     
     def get_first_free_reserve_datetime(self, doctor):
-        first_free_reserve = Reserve.objects.filter(doctor=doctor, reserve_datetime__gte=datetime.now(tz=TEHRAN_TZ)).first()
+        first_free_reserve = Reserve.objects.filter(doctor=doctor, reserve_datetime__gte=datetime.now(tz=TEHRAN_TZ), patient__isnull=True).order_by('reserve_datetime').first()
         today_date = date.today()
         first_free_reserve_date = first_free_reserve.reserve_datetime.date()
 
@@ -367,9 +383,9 @@ class DoctorDetailSerializer(serializers.ModelSerializer):
         super().__init__(*args, **kwargs)
         self._doctor_reserves_cache = None
 
-    def _get_doctor_reserves(self, doctor):
+    def _get_doctor_free_reserves(self, doctor):
         if self._doctor_reserves_cache is None:
-            self._doctor_reserves_cache = list(Reserve.objects.filter(doctor=doctor, reserve_datetime__gte=datetime.now(tz=TEHRAN_TZ)))
+            self._doctor_reserves_cache = list(Reserve.objects.filter(doctor=doctor, reserve_datetime__gte=datetime.now(tz=TEHRAN_TZ), patient__isnull=True).order_by('reserve_datetime'))
         return self._doctor_reserves_cache
         
     def get_age(self, doctor):
@@ -408,10 +424,10 @@ class DoctorDetailSerializer(serializers.ModelSerializer):
         return None
     
     def get_has_free_reserve(self, doctor):
-        return bool(self._get_doctor_reserves(doctor))
+        return bool(self._get_doctor_free_reserves(doctor))
     
     def get_alternative_doctors(self, doctor):
-        if bool(self._get_doctor_reserves(doctor)):
+        if bool(self._get_doctor_free_reserves(doctor)):
             return []
         
         queryset = Doctor.objects.prefetch_related(

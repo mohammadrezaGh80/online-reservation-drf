@@ -11,12 +11,17 @@ from django.shortcuts import get_object_or_404
 
 from django_filters.rest_framework import DjangoFilterBackend
 from functools import cached_property
+from datetime import datetime, timedelta, timezone
 
 from .models import Doctor, DoctorInsurance, DoctorSpecialty, Insurance, Patient, Province, City, Reserve, Comment, Specialty
 from . import serializers
 from .paginations import CustomLimitOffsetPagination
 from .filters import PatientFilter, DoctorFilter, CommentListWaitingFilter, ReserveDoctorFilter
 from .permissions import IsDoctor, IsPatientInfoComplete, IsDoctorOfficeAddressInfoComplete, IsDoctorOfficeAddressInfoCompleteForAdmin
+
+
+TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
+
 
 class ProvinceViewSet(ModelViewSet):
     queryset = Province.objects.order_by('-id')
@@ -185,6 +190,10 @@ class DoctorViewSet(ModelViewSet):
                 ).prefetch_related(
                     Prefetch('comments',
                              queryset=Comment.objects.filter(status=Comment.COMMENT_STATUS_APPROVED).select_related('patient').order_by('-created_datetime'))
+                ).prefetch_related(
+                    Prefetch('reserves',
+                             queryset=Reserve.objects.filter(reserve_datetime__gte=datetime.now(tz=TEHRAN_TZ), patient__isnull=True).order_by('reserve_datetime'),
+                             to_attr='doctor_free_reserves')
                 ).order_by('-confirm_datetime')
     pagination_class = CustomLimitOffsetPagination
     filter_backends = [DjangoFilterBackend]
