@@ -1,3 +1,4 @@
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from rest_framework_nested import routers
@@ -26,4 +27,7 @@ doctors_router = routers.NestedDefaultRouter(router, 'doctors', lookup='doctor')
 doctors_router.register('comments', views.CommentViewSet, basename='doctor-comments')
 doctors_router.register('reserves', views.ReserveDoctorViewSet, basename='doctor-reserves')
 
-urlpatterns = router.urls + provinces_router.urls + patients_router.urls + doctors_router.urls
+urlpatterns = router.urls + provinces_router.urls + patients_router.urls + doctors_router.urls + [
+    path('payment/', views.PaymentProcessSandboxGenericAPIView.as_view(), name='payment-process-sandbox'),
+    path('payment/callback/', views.PaymentCallbackSandboxAPIView.as_view(), name='payment-callback-sandbox')
+]

@@ -290,6 +290,9 @@ class Reserve(models.Model):
     price = models.PositiveIntegerField(verbose_name=_('Price'))
     reserve_datetime = models.DateTimeField(unique=True, verbose_name=_('Reserve datetime')) # TODO: in same day and time, doctor can't add more than one reserve && if reserve_datetime has passed delete it reserve
 
+    zarinpal_authority = models.CharField(max_length=255, blank=True, verbose_name=_('Zarinpal authority'))
+    zarinpal_ref_id = models.CharField(max_length=255, blank=True, verbose_name=_('Zarinpal ref_id'))
+
     def __str__(self):
         return f'{self.patient}(Doctor: {self.doctor.first_name}): {self.reserve_datetime}' # TODO: if not exist patient, show proper str
     

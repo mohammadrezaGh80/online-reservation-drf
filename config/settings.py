@@ -165,3 +165,6 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.environ.get('JWT_ACCESS_TOKEN_LIFETIME_MINUTES', 30))),
     "REFRESH_TOKEN_LIFETIME": timedelta(minutes=int(os.environ.get('JWT_REFRESH_TOKEN_LIFETIME_MINUTES', 1440)))
 }
+
+# Config zarinpal
+ZARINPAL_MERCHANT_ID = os.environ.get('DJANGO_ZARINPAL_MERCHANT_ID')

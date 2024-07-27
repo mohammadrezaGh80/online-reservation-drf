@@ -1,13 +1,17 @@
-from rest_framework import status
+from rest_framework import status as status_code
+from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.views import APIView
 from django.utils.translation import gettext as _
 from django.http import Http404
 from django.db.models import Prefetch
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
+from django.conf import settings
+from django.urls import reverse
 
 from django_filters.rest_framework import DjangoFilterBackend
 from functools import cached_property
@@ -18,6 +22,7 @@ from . import serializers
 from .paginations import CustomLimitOffsetPagination
 from .filters import PatientFilter, DoctorFilter, CommentListWaitingFilter, ReserveDoctorFilter
 from .permissions import IsDoctor, IsPatientInfoComplete, IsDoctorOfficeAddressInfoComplete, IsDoctorOfficeAddressInfoCompleteForAdmin
+from .payment import ZarinpalSandbox
 
 
 TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
@@ -38,7 +43,7 @@ class ProvinceViewSet(ModelViewSet):
             return Response({'detail': _('There is some patients relating this province, Please remove them first.')}, status=status.HTTP_400_BAD_REQUEST)
 
         instance.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(status=status_code.HTTP_204_NO_CONTENT)
     
     def get_serializer_class(self):
         if self.action == 'retrieve':
@@ -81,10 +86,10 @@ class InsuranceViewSet(ModelViewSet):
         instance = self.get_object()
 
         if instance.patients.count() > 0:
-            return Response({'detail': _('There is some patients relating this insurance, Please remove them first.')}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': _('There is some patients relating this insurance, Please remove them first.')}, status=status_code.HTTP_400_BAD_REQUEST)
 
         instance.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(status=status_code.HTTP_204_NO_CONTENT)
 
 
 class SpecialtyViewSet(ModelViewSet):
@@ -120,12 +125,12 @@ class PatientViewSet(ModelViewSet):
 
         if request.method == 'GET':
             serializer = serializers.PatientDetailSerializer(patient)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.data, status=status_code.HTTP_200_OK)
         elif request.method == 'PUT':
             serializer = serializers.PatientUpdateSerializer(patient, data=request.data)
             serializer.is_valid(raise_exception=True)
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.data, status=status_code.HTTP_200_OK)
 
 
 class ReservePatientViewSet(ModelViewSet):
@@ -217,10 +222,10 @@ class DoctorViewSet(ModelViewSet):
         instance = self.get_object()
 
         if instance.reserves.count() > 0:
-            return Response({'detail': _('There is some reserves relating this doctor, Please remove them first.')}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': _('There is some reserves relating this doctor, Please remove them first.')}, status=status_code.HTTP_400_BAD_REQUEST)
         
         instance.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(status=status_code.HTTP_204_NO_CONTENT)
     
     @action(detail=False, methods=['GET', 'PUT', 'PATCH', 'DELETE'], permission_classes=[IsDoctor])
     def me(self, request, *args, **kwargs):
@@ -229,7 +234,7 @@ class DoctorViewSet(ModelViewSet):
 
         if request.method == 'GET':
             serializer = serializers.DoctorDetailSerializer(doctor)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.data, status=status_code.HTTP_200_OK)
         elif request.method in ['PUT', 'PATCH']:
             partial = False
             if request.method == 'PATCH':
@@ -237,13 +242,13 @@ class DoctorViewSet(ModelViewSet):
             serializer = serializers.DoctorUpdateSerializer(doctor, data=request.data,  partial=partial, context=self.get_serializer_context())
             serializer.is_valid(raise_exception=True)
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.data, status=status_code.HTTP_200_OK)
         elif request.method == 'DELETE':
             if doctor.reserves.count() > 0:
-                return Response({'detail': _('There is some reserves relating to you, Please remove them first.')}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'detail': _('There is some reserves relating to you, Please remove them first.')}, status=status_code.HTTP_400_BAD_REQUEST)
             
             doctor.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response(status=status_code.HTTP_204_NO_CONTENT)
 
 
 class CommentViewSet(ModelViewSet):
@@ -316,7 +321,7 @@ class CommentListWaitingViewSet(ModelViewSet):
         if comment_status == Comment.COMMENT_STATUS_NOT_APPROVED:
             instance.delete()        
         
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.data, status=status_code.HTTP_200_OK)
 
 
 class ReserveDoctorViewSet(ModelViewSet):
@@ -365,3 +370,87 @@ class ReserveDoctorViewSet(ModelViewSet):
     
     def get_serializer_context(self):
         return {'doctor': self.doctor}
+
+
+class PaymentProcessSandboxGenericAPIView(generics.GenericAPIView):
+    serializer_class = serializers.ReservePaymentQueryParamSerializer
+    permission_classes = [IsAuthenticated, IsPatientInfoComplete]
+
+    def get_queryset(self):
+        return Reserve.objects.prefetch_related(
+            Prefetch('doctor__specialties',
+                     queryset=DoctorSpecialty.objects.select_related('specialty'))
+        ).select_related('doctor', 'patient__province', 'patient__city', 'patient__insurance')
+
+    def get(self, request, *args, **kwargs):
+        serializer_query_param = self.get_serializer(data=request.query_params)
+        serializer_query_param.is_valid(raise_exception=True)
+
+        reserve_id = serializer_query_param.validated_data.get('reserve_id')
+        reserve = self.get_queryset().get(pk=reserve_id)
+
+        if not reserve.patient:
+            reserve.patient = request.user.patient
+            reserve.save(update_fields=['patient'])
+
+        serializer = serializers.ReservePaymentSerializer(reserve)
+        return Response(serializer.data, status=status_code.HTTP_200_OK)
+    
+    def post(self, request, *args, **kwargs):
+        serializer_query_param = self.get_serializer(data=request.data)
+        serializer_query_param.is_valid(raise_exception=True)
+
+        reserve_id = serializer_query_param.validated_data.get('reserve_id')
+        reserve = self.get_queryset().get(pk=reserve_id)
+
+        if not reserve.patient:
+            reserve.patient = request.user.patient
+            reserve.save(update_fields=['patient'])
+        
+        zarinpal_sandbox = ZarinpalSandbox(settings.ZARINPAL_MERCHANT_ID)
+        data = zarinpal_sandbox.payment_request(
+            toman_total_price=reserve.price, 
+            description=f'#{reserve.id}: {reserve.patient.full_name}',
+            callback_url=request.build_absolute_uri(reverse('online_reservation:payment-callback-sandbox'))
+        )
+
+        authority = data['Authority']
+        
+        reserve.zarinpal_authority = authority
+        reserve.save(update_fields=['zarinpal_authority'])
+
+        if 'errors' not in data or len(data['errors']) == 0:
+            return redirect(zarinpal_sandbox.generate_payment_page_url(authority=authority))
+        else:
+            return Response({'detail': _('Error from zarinpal.')}, status=status_code.HTTP_400_BAD_REQUEST)
+
+
+class PaymentCallbackSandboxAPIView(APIView):
+
+    def get(self, request, *args, **kwargs):
+        status = request.query_params.get('Status')
+        authority = request.query_params.get('Authority')
+
+        reserve = get_object_or_404(Reserve, zarinpal_authority=authority)
+
+        if status == 'OK':
+            zarinpal_sandbox = ZarinpalSandbox(settings.ZARINPAL_MERCHANT_ID)
+            data = zarinpal_sandbox.payment_verify(
+                toman_total_price=reserve.price, 
+                authority=authority
+            )
+            
+            payment_status = data['Status']
+
+            if payment_status == 100:
+                reserve.status = Reserve.RESERVE_STATUS_PAID
+                reserve.zarinpal_ref_id = data['RefID']
+                reserve.save(update_fields=['status', 'zarinpal_ref_id'])
+
+                return Response({'detail': _('Your payment has been successfully complete.')}, status=status_code.HTTP_200_OK)
+            elif payment_status == 101:
+                return Response({'detail': _('Your payment has been successfully complete and has already been register.')}, status=status_code.HTTP_200_OK)
+            else:
+                return Response({'detail': _('The payment was unsuccessful.')}, status=status_code.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({'detail': _('The payment was unsuccessful.')}, status=status_code.HTTP_400_BAD_REQUEST)
