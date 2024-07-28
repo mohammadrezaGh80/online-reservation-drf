@@ -58,3 +58,13 @@ class IsDoctorOfficeAddressInfoCompleteForAdmin(BasePermission):
                 )
         
         return True
+
+
+class IsDoctorOrPatient(BasePermission):
+
+    def has_permission(self, request, view):
+        user = request.user
+
+        if getattr(user, 'doctor', False) and user.doctor.status == Doctor.DOCTOR_STATUS_ACCEPTED:
+            raise PermissionDenied(_('You are currently a doctor.'))  
+        return True

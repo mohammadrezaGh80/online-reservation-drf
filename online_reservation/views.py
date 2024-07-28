@@ -21,7 +21,7 @@ from .models import Doctor, DoctorInsurance, DoctorSpecialty, Insurance, Patient
 from . import serializers
 from .paginations import CustomLimitOffsetPagination
 from .filters import PatientFilter, DoctorFilter, CommentListWaitingFilter, ReserveDoctorFilter
-from .permissions import IsDoctor, IsPatientInfoComplete, IsDoctorOfficeAddressInfoComplete, IsDoctorOfficeAddressInfoCompleteForAdmin
+from .permissions import IsDoctor, IsPatientInfoComplete, IsDoctorOfficeAddressInfoComplete, IsDoctorOfficeAddressInfoCompleteForAdmin, IsDoctorOrPatient
 from .payment import ZarinpalSandbox
 
 
@@ -38,9 +38,9 @@ class ProvinceViewSet(ModelViewSet):
         instance = self.get_object()
 
         if instance.doctors.count() > 0:
-            return Response({'detail': _('There is some doctors relating this province, Please remove them first.')}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': _('There is some doctors relating this province, Please remove them first.')}, status=status_code.HTTP_400_BAD_REQUEST)
         elif instance.patients.count() > 0:
-            return Response({'detail': _('There is some patients relating this province, Please remove them first.')}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': _('There is some patients relating this province, Please remove them first.')}, status=status_code.HTTP_400_BAD_REQUEST)
 
         instance.delete()
         return Response(status=status_code.HTTP_204_NO_CONTENT)
@@ -454,3 +454,14 @@ class PaymentCallbackSandboxAPIView(APIView):
                 return Response({'detail': _('The payment was unsuccessful.')}, status=status_code.HTTP_400_BAD_REQUEST)
         else:
             return Response({'detail': _('The payment was unsuccessful.')}, status=status_code.HTTP_400_BAD_REQUEST)
+
+
+class RequestDoctorGenericAPIView(generics.GenericAPIView):
+    serializer_class = serializers.RequestDoctorSerializer
+    permission_classes = [IsAuthenticated, IsDoctorOrPatient]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({'detail': _('Your request has been successfully registered.')}, status=status_code.HTTP_200_OK)

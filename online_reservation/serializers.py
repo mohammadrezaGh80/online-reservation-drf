@@ -846,3 +846,59 @@ class ReservePaymentSerializer(serializers.ModelSerializer):
     def get_specialties(self, reserve):
         serializer = DoctorSpecialtySerializer(reserve.doctor.specialties, many=True)
         return serializer.data
+
+
+class RequestDoctorSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(max_length=255)
+    last_name = serializers.CharField(max_length=255)
+    national_code = serializers.CharField(max_length=10, validators=[NationalCodeValidator()])
+    gender = serializers.ChoiceField(choices=Doctor.PERSON_GENDER)
+    specialties_list = serializers.ListField(
+        child=serializers.PrimaryKeyRelatedField(queryset=Specialty.objects.all()),
+        write_only=True
+    )
+
+    class Meta:
+        model = Doctor
+        fields = ['id', 'medical_council_number', 'first_name', 'last_name', 
+                  'national_code', 'email', 'gender', 'specialties_list']
+        
+    def validate_gender(self, gender):
+        if gender not in [Doctor.PERSON_GENDER_MALE, Doctor.PERSON_GENDER_FEMALE]:
+            raise serializers.ValidationError(_('Please choose your gender.'))
+        return gender
+    
+    def validate_specialties_list(self, specialties_list):
+        if not specialties_list:
+            raise serializers.ValidationError(_('The doctor must have at least one specialty.'))
+        return specialties_list
+        
+    def validate(self, attrs):
+        request = self.context.get('request')
+
+        if getattr(request.user, 'doctor', False) and request.user.doctor.status == Doctor.DOCTOR_STATUS_WAITING:
+            raise serializers.ValidationError({'detail': _('You have already applied, your request is under review.')})
+
+        return super().validate(attrs)
+    
+    def create(self, validated_data):
+        with transaction.atomic():
+            request = self.context.get('request')
+            specialties_list = validated_data.pop('specialties_list')
+
+            doctor = Doctor.objects.create(
+                **validated_data,
+                user=request.user
+                )
+
+            for specialty in specialties_list:
+                if DoctorSpecialty.objects.filter(doctor=doctor, specialty=specialty).exists():
+                    raise serializers.ValidationError(
+                        {'detail': _('The doctor %(doctor_full_name)s has already the specialty %(specialty_name)s.') % {'doctor_full_name': doctor.full_name, 'specialty_name': specialty.name}}
+                    )
+                DoctorSpecialty.objects.create(
+                    specialty=specialty,
+                    doctor=doctor
+                )
+
+            return doctor
