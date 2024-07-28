@@ -902,3 +902,33 @@ class RequestDoctorSerializer(serializers.ModelSerializer):
                 )
 
             return doctor
+
+
+class DoctorListRequestSerializer(serializers.ModelSerializer):
+    specialties = DoctorSpecialtySerializer(many=True)
+
+    class Meta:
+        model = Doctor
+        fields = ['id', 'medical_council_number', 'first_name', 'last_name', 
+                  'national_code', 'email', 'gender', 'specialties']
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['gender'] = instance.get_gender_display()
+        return representation
+
+
+class DoctorListRequestUpdateSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Doctor
+        fields = ['id', 'status']
+    
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['status'] = instance.get_status_display()
+        return representation
+    
+    def update(self, instance, validated_data):
+        validated_data['confirm_datetime'] = datetime.now(tz=TEHRAN_TZ)
+        return super().update(instance, validated_data)

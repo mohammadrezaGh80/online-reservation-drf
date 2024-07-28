@@ -310,18 +310,6 @@ class CommentListWaitingViewSet(ModelViewSet):
         elif self.action == 'retrieve':
             return serializers.CommentListWaitingDetailSerializer
         return serializers.CommentListWaitingSerializer
-    
-    def partial_update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        comment_status = serializer.validated_data.get('status')
-        serializer.save()
-        
-        if comment_status == Comment.COMMENT_STATUS_NOT_APPROVED:
-            instance.delete()        
-        
-        return Response(serializer.data, status=status_code.HTTP_200_OK)
 
 
 class ReserveDoctorViewSet(ModelViewSet):
@@ -465,3 +453,17 @@ class RequestDoctorGenericAPIView(generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response({'detail': _('Your request has been successfully registered.')}, status=status_code.HTTP_200_OK)
+
+
+class DoctorListRequestViewSet(ModelViewSet):
+    http_method_names = ['get', 'head', 'options', 'patch']
+    queryset = Doctor.objects.filter(status=Doctor.DOCTOR_STATUS_WAITING).prefetch_related(
+        Prefetch('specialties',
+                 queryset=DoctorSpecialty.objects.select_related('specialty'))
+    )
+    permission_classes = [IsAdminUser]
+
+    def get_serializer_class(self):
+        if self.action == 'partial_update':
+            return serializers.DoctorListRequestUpdateSerializer
+        return serializers.DoctorListRequestSerializer

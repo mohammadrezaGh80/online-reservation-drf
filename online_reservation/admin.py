@@ -132,6 +132,14 @@ class DoctorAdmin(admin.ModelAdmin):
     autocomplete_fields = ['user', 'province', 'city']
     ordering = ['-confirm_datetime']
 
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+
+        status_field = form.base_fields.get('status')
+        if (obj is None) or (obj and obj.reserves.count() > 0):
+            status_field.choices = [(key, value) for key, value in status_field.choices if key != 'r']
+        return form
+
     def get_queryset(self, request):
         return super().get_queryset(request)\
                .annotate(specialties_count=Count('specialties', distinct=True), reserves_count=Count('reserves', distinct=True), comments_count=Count('comments', distinct=True))
@@ -234,6 +242,15 @@ class CommentAdmin(admin.ModelAdmin):
     autocomplete_fields = ['patient', 'doctor']
     ordering = ['-created_datetime']
     list_editable = ['status']
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+
+        if obj is None:
+            status_field = form.base_fields.get('status')
+            if status_field:
+                status_field.choices = [(key, value) for key, value in status_field.choices if key != 'na']
+        return form
 
     @admin.display(description=_('doctor'))
     def get_doctor(self, comment):
