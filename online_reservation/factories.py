@@ -91,7 +91,7 @@ class SpecialtyFactory(DjangoModelFactory):
     class Meta:
         model = models.Specialty
     
-    name = factory.LazyFunction(lambda: fake.word())
+    name = factory.LazyFunction(lambda: fake.unique.word())
 
 
 class CommentFactory(DjangoModelFactory):

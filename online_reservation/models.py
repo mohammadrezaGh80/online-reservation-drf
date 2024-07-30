@@ -66,7 +66,7 @@ class Person(models.Model):
     last_name = models.CharField(max_length=255, blank=True, verbose_name=_('Last name'))
     birth_date = models.DateField(blank=True, null=True, verbose_name=_('Birth date'))
     national_code = models.CharField(max_length=10, blank=True, validators=[national_code_validator], verbose_name=_('National code'))
-    email = models.EmailField(null=True, blank=True, verbose_name=_('Email'))
+    email = models.EmailField(blank=True, verbose_name=_('Email'))
     gender = models.CharField(max_length=1, choices=PERSON_GENDER, blank=True, default=PERSON_GENDER_NOT_DEFINED, verbose_name=_('Gender'))
 
     @property

@@ -82,7 +82,7 @@ class InsuranceAdmin(admin.ModelAdmin):
 
 @admin.register(models.Patient)
 class PatientAdmin(admin.ModelAdmin):
-    list_display = ['get_phone', 'national_code', 'first_name', 'last_name', 'gender', 'insurance', 'is_foreign_national', 'city', 'num_of_reserves', 'num_of_comments']
+    list_display = ['get_phone', 'national_code', 'first_name', 'last_name', 'email', 'gender', 'insurance', 'is_foreign_national', 'city', 'num_of_reserves', 'num_of_comments']
     list_per_page = 15
     list_select_related = ['insurance', 'city', 'user']
     search_fields = ['first_name', 'last_name', 'user__phone']

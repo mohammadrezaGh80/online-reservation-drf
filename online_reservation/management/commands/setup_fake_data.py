@@ -1,7 +1,7 @@
 from django.core.management import BaseCommand
 
 from faker import Faker
-import requests
+import json
 import random
 from datetime import datetime, timezone
 
@@ -15,9 +15,6 @@ from online_reservation.factories import (
     CommentFactory,
     ReserveFactory
 )
-
-API_LIST_PROVINCES = 'https://iran-locations-api.ir/api/v1/fa/states'
-API_LIST_CITIES = 'https://iran-locations-api.ir/api/v1/fa/cities'
 
 fake = Faker(locale='fa_IR')
 
@@ -47,9 +44,9 @@ class Command(BaseCommand):
 
         # provinces & cities data
         print(f'Adding provinces & cities...', end='')
-        response = requests.get(API_LIST_PROVINCES)
-        list_provinces = response.json()
-        
+        with open('json/provinces.json') as file:
+            list_provinces = json.loads(file.read())
+
         all_provinces = []
         all_cities = []
         all_provinces_with_cities_dict = {province.get('name'): [] for province in list_provinces}
@@ -60,10 +57,11 @@ class Command(BaseCommand):
             )
             all_provinces.append(province)
             
-            response = requests.get(API_LIST_CITIES + f"?state_id={province_dict.get('id')}")
-            list_cities = response.json()
-            
-            for city_dict in list_cities:
+            with open('json/cities.json') as file:
+                 list_cities = json.loads(file.read())
+                
+            list_citiesـof_province = [city for city in list_cities if city.get('province_id') == province_dict.get('id')]
+            for city_dict in list_citiesـof_province:
                 city = City(
                     name=city_dict.get('name'),
                     province=province

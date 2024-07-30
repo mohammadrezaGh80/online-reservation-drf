@@ -16,7 +16,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='doctor',
             name='email',
-            field=models.EmailField(blank=True, max_length=254, null=True, verbose_name='Email'),
+            field=models.EmailField(blank=True, max_length=254, verbose_name='Email'),
         ),
         migrations.AlterField(
             model_name='doctor',
@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='patient',
             name='email',
-            field=models.EmailField(blank=True, max_length=254, null=True, verbose_name='Email'),
+            field=models.EmailField(blank=True, max_length=254, verbose_name='Email'),
         ),
         migrations.AlterField(
             model_name='patient',
