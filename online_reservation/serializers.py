@@ -427,10 +427,10 @@ class DoctorDetailSerializer(serializers.ModelSerializer):
             first_free_reserve_datetime = first_free_reserve.reserve_datetime
 
             if today_date == first_free_reserve_datetime.date():
-                return _('Today') + ' ' + str(first_free_reserve_datetime.astimezone(TEHRAN_TZ).strftime('%-m-%-d %H:%M'))
+                return _('Today') + ' ' + str(first_free_reserve_datetime.astimezone(TEHRAN_TZ).strftime('%m-%d %H:%M'))
             elif today_date + timedelta(days=1) == first_free_reserve_datetime.date():
-                return _('Tomorrow') + ' ' + str(first_free_reserve_datetime.astimezone(TEHRAN_TZ).strftime('%-m-%-d %H:%M'))
-            return str(first_free_reserve_datetime.astimezone(TEHRAN_TZ).strftime('%-m-%-d %H:%M'))
+                return _('Tomorrow') + ' ' + str(first_free_reserve_datetime.astimezone(TEHRAN_TZ).strftime('%m-%d %H:%M'))
+            return str(first_free_reserve_datetime.astimezone(TEHRAN_TZ).strftime('%m-%d %H:%M'))
         return None
     
     def get_alternative_doctors(self, doctor):

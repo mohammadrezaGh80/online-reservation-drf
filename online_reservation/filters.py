@@ -2,9 +2,12 @@ from django.utils.translation import gettext_lazy as _
 from django.shortcuts import get_object_or_404
 
 import django_filters
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta, datetime, timezone
 
 from .models import Doctor, Patient, Province, City, Insurance, Specialty, Reserve
+
+
+TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
 
 
 class PersonFilter(django_filters.FilterSet):
@@ -76,6 +79,7 @@ class PatientFilter(PersonFilter):
 class DoctorFilter(PersonFilter):
     specialty = django_filters.NumberFilter(field_name='specialties__specialty', method='filter_specialty', label='specialty')
     insurance = django_filters.NumberFilter(field_name='insurances__insurance', method='filter_insurance', label='insurance')
+    has_free_reserve = django_filters.BooleanFilter(field_name='reserves__reserve_datetime', method='filter_has_free_reserve', label='has_free_reserve')
 
     def filter_specialty(self, queryset, field_name, value):
         specialty = get_object_or_404(Specialty, pk=value)
@@ -86,6 +90,14 @@ class DoctorFilter(PersonFilter):
         insurance = get_object_or_404(Insurance, pk=value)
         filter_condition = {field_name: insurance}
         return queryset.filter(**filter_condition)
+    
+    def filter_has_free_reserve(self, queryset, field_name, value):
+        if value:
+            return queryset.filter(
+                reserves__reserve_datetime__gte=datetime.now(tz=TEHRAN_TZ), 
+                reserves__patient__isnull=True
+            ).order_by('id').distinct('id')
+        return queryset
 
 
 class CommentListWaitingFilter(django_filters.FilterSet):
