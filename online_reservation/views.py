@@ -12,6 +12,7 @@ from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404, redirect
 from django.conf import settings
 from django.urls import reverse
+from django.db.models import Min, Count, Q
 
 from django_filters.rest_framework import DjangoFilterBackend
 from functools import cached_property
@@ -23,6 +24,7 @@ from .paginations import CustomLimitOffsetPagination
 from .filters import PatientFilter, DoctorFilter, CommentListWaitingFilter, ReserveDoctorFilter
 from .permissions import IsDoctor, IsPatientInfoComplete, IsDoctorOfficeAddressInfoComplete, IsDoctorOfficeAddressInfoCompleteForAdmin, IsDoctorOrPatient
 from .payment import ZarinpalSandbox
+from .ordering import DoctorOrderingFilter
 
 
 TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
@@ -181,13 +183,16 @@ class ReservePatientViewSet(ModelViewSet):
 
 
 class DoctorViewSet(ModelViewSet):
-    queryset = Doctor.objects.filter(status=Doctor.DOCTOR_STATUS_ACCEPTED).select_related('province', 'city')\
-               .prefetch_related(
+    queryset = Doctor.objects.filter(status=Doctor.DOCTOR_STATUS_ACCEPTED).annotate(
+                    max_successful_reserve=Count('reserves', filter=Q(reserves__status=Reserve.RESERVE_STATUS_PAID)),
+                    closest_free_reserve=Min('reserves__reserve_datetime', filter=Q(reserves__reserve_datetime__gte=datetime.now(tz=TEHRAN_TZ), reserves__patient__isnull=True))
+                ).select_related('province', 'city')\
+                .prefetch_related(
                    Prefetch('reserves',
                             queryset=Reserve.objects.filter(status=Reserve.RESERVE_STATUS_PAID),
                             to_attr='doctor_reserves')
                 ).prefetch_related(
-                    Prefetch('specialties',
+                Prefetch('specialties',
                              queryset=DoctorSpecialty.objects.select_related('specialty'))
                 ).prefetch_related(
                     Prefetch('insurances',
@@ -201,8 +206,9 @@ class DoctorViewSet(ModelViewSet):
                              to_attr='doctor_free_reserves')
                 ).order_by('-confirm_datetime')
     pagination_class = CustomLimitOffsetPagination
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, DoctorOrderingFilter]
     filterset_class = DoctorFilter
+    ordering_fields = ['max_successful_reserve', 'closest_free_reserve']
 
     def get_serializer_class(self):
         if self.action == 'retrieve':

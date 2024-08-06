@@ -1,3 +1,4 @@
+from typing import Any
 from django.contrib import admin
 from django.db.models import Count
 from django.urls import reverse
@@ -13,6 +14,13 @@ from . import models
 TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
 
 
+# Inlines
+class DoctorSpecialtyInline(admin.TabularInline):
+    model = models.DoctorSpecialty
+    extra = 1
+
+
+# Model Admins
 @admin.register(models.Province)
 class ProvinceAdmin(admin.ModelAdmin):
     list_display = ['name', 'num_of_cities']
@@ -130,6 +138,7 @@ class DoctorAdmin(admin.ModelAdmin):
     list_select_related = ['city', 'user']
     search_fields = ['first_name', 'last_name']
     autocomplete_fields = ['user', 'province', 'city']
+    inlines = [DoctorSpecialtyInline]
     ordering = ['-confirm_datetime']
 
     def get_form(self, request, obj=None, **kwargs):
@@ -270,7 +279,7 @@ class ReserveAdmin(admin.ModelAdmin):
     autocomplete_fields = ['patient', 'doctor']
     ordering = ['-reserve_datetime']
 
-    @admin.display(description=_('doctor'))
+    @admin.display(description=_('doctor'), ordering='doctor__id')
     def get_doctor(self, reserve):
         return reserve.doctor.full_name
     
