@@ -1,5 +1,6 @@
 from django.utils.translation import gettext_lazy as _
 from django.shortcuts import get_object_or_404
+from django.db.models import Subquery, OuterRef
 
 import django_filters
 from datetime import date, timedelta, datetime, timezone
@@ -93,10 +94,18 @@ class DoctorFilter(PersonFilter):
     
     def filter_has_free_reserve(self, queryset, field_name, value):
         if value:
-            return queryset.filter(
-                reserves__reserve_datetime__gte=datetime.now(tz=TEHRAN_TZ), 
-                reserves__patient__isnull=True
-            ).order_by('id').distinct('id')
+            first_free_reserve_subquery = Reserve.objects.filter(
+                doctor=OuterRef('pk'),
+                reserve_datetime__gte=datetime.now(tz=TEHRAN_TZ),
+                patient__isnull=True
+            ).order_by('reserve_datetime').values('reserve_datetime')[:1]
+
+            return queryset.annotate(
+                first_free_reserve_datetime=Subquery(first_free_reserve_subquery)
+            ).filter(
+                first_free_reserve_datetime__isnull=False
+            ).order_by('first_free_reserve_datetime')
+
         return queryset
 
 
