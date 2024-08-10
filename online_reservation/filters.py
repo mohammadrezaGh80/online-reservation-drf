@@ -1,6 +1,7 @@
 from django.utils.translation import gettext_lazy as _
 from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef
+from rest_framework.exceptions import ValidationError
 
 import django_filters
 from datetime import date, timedelta, datetime, timezone
@@ -140,3 +141,17 @@ class ReserveDoctorFilter(django_filters.FilterSet):
     class Meta:
         model = Reserve
         fields = ['status', 'is_expired', 'year', 'month', 'day']
+
+
+class AppointmentDoctorFilter(django_filters.FilterSet):
+    reserve_date = django_filters.DateFilter(field_name='reserve_datetime__date', method='filter_reserve_date', label='reserve_date') 
+
+    def filter_reserve_date(self, queryset, field_name, value):
+        if value < date.today():
+            raise ValidationError({'reserve_date': _('Cannot select a date before today.')})
+        filter_condition = {field_name: value}
+        return queryset.filter(**filter_condition)
+
+    class Meta:
+        model = Reserve
+        fields = ['reserve_date']

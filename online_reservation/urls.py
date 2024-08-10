@@ -31,5 +31,6 @@ doctors_router.register('reserves', views.ReserveDoctorViewSet, basename='doctor
 urlpatterns = router.urls + provinces_router.urls + patients_router.urls + doctors_router.urls + [
     path('payment/', views.PaymentProcessSandboxGenericAPIView.as_view(), name='payment-process-sandbox'),
     path('payment/callback/', views.PaymentCallbackSandboxAPIView.as_view(), name='payment-callback-sandbox'),
-    path('request-doctor/', views.RequestDoctorGenericAPIView.as_view(), name='request-doctor')
+    path('request-doctor/', views.RequestDoctorGenericAPIView.as_view(), name='request-doctor'),
+    path('doctors/<int:pk>/appointments/', views.AppointmentDoctorGenericAPIView.as_view(), name='appointment')
 ]

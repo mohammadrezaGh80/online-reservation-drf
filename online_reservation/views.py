@@ -16,12 +16,12 @@ from django.db.models import Min, Count, Q
 
 from django_filters.rest_framework import DjangoFilterBackend
 from functools import cached_property
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 
 from .models import Doctor, DoctorInsurance, DoctorSpecialty, Insurance, Patient, Province, City, Reserve, Comment, Specialty
 from . import serializers
 from .paginations import CustomLimitOffsetPagination
-from .filters import PatientFilter, DoctorFilter, CommentListWaitingFilter, ReserveDoctorFilter
+from .filters import PatientFilter, DoctorFilter, CommentListWaitingFilter, ReserveDoctorFilter, AppointmentDoctorFilter
 from .permissions import IsDoctor, IsPatientInfoComplete, IsDoctorOfficeAddressInfoComplete, IsDoctorOfficeAddressInfoCompleteForAdmin, IsDoctorOrPatient
 from .payment import ZarinpalSandbox
 from .ordering import DoctorOrderingFilter
@@ -255,6 +255,26 @@ class DoctorViewSet(ModelViewSet):
             
             doctor.delete()
             return Response(status=status_code.HTTP_204_NO_CONTENT)
+
+
+class AppointmentDoctorGenericAPIView(generics.GenericAPIView):
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = AppointmentDoctorFilter
+
+    @cached_property
+    def doctor(self):
+        doctor_pk = self.kwargs.get('pk')
+        doctor = get_object_or_404(Doctor, pk=doctor_pk)
+        return doctor
+
+    def get_queryset(self):
+        doctor = self.doctor
+        return doctor.reserves.select_related('patient').filter(reserve_datetime__gte=datetime.now(tz=TEHRAN_TZ)).order_by('-reserve_datetime')
+
+    def get(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = serializers.ReserveDoctorSerializer(queryset, many=True)
+        return Response(serializer.data, status=status_code.HTTP_200_OK)
 
 
 class CommentViewSet(ModelViewSet):

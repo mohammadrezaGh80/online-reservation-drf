@@ -639,7 +639,7 @@ class ReservePatientSerializer(serializers.ModelSerializer):
         fields = ['id', 'doctor', 'status', 'price', 'reserve_datetime', 'is_expired']
     
     def get_is_expired(self, reserve):
-        return True if reserve.reserve_datetime < datetime.now(tz=timezone.utc) else False
+        return True if reserve.reserve_datetime < datetime.now(tz=TEHRAN_TZ) else False
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -657,7 +657,7 @@ class ReservePatientDetailSerializer(serializers.ModelSerializer):
         fields = ['id', 'doctor', 'status', 'price', 'reserve_datetime', 'is_expired']
     
     def get_is_expired(self, reserve):
-        return True if reserve.reserve_datetime < datetime.now(tz=timezone.utc) else False
+        return True if reserve.reserve_datetime < datetime.now(tz=TEHRAN_TZ) else False
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -748,7 +748,7 @@ class ReserveDoctorSerializer(serializers.ModelSerializer):
         return None
     
     def get_is_expired(self, reserve):
-        return True if reserve.reserve_datetime < datetime.now(tz=timezone.utc) else False
+        return True if reserve.reserve_datetime < datetime.now(tz=TEHRAN_TZ) else False
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -766,7 +766,7 @@ class ReserveDoctorDetailSerializer(serializers.ModelSerializer):
         fields = ['id', 'patient', 'status', 'price', 'reserve_datetime', 'is_expired']
 
     def get_is_expired(self, reserve):
-        return True if reserve.reserve_datetime < datetime.now(tz=timezone.utc) else False
+        return True if reserve.reserve_datetime < datetime.now(tz=TEHRAN_TZ) else False
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
