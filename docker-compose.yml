@@ -23,6 +23,8 @@ services:
       - "JWT_REFRESH_TOKEN_LIFETIME_MINUTES=${DOCKER_COMPOSE_JWT_REFRESH_TOKEN_LIFETIME_MINUTES}"
     depends_on:
       - postgres
+      - redis
+      - rabbitmq
   
   postgres:
     image: postgres:16.3-alpine
@@ -37,6 +39,31 @@ services:
       - "POSTGRES_PASSWORD=${DOCKER_COMPOSE_POSTGRES_PASSWORD}"
       - "POSTGRES_HOST=${DOCKER_COMPOSE_POSTGRES_HOST}"
       - "POSTGRES_PORT=${DOCKER_COMPOSE_POSTGRES_PORT}"
+  
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:3.12.14-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+  
+  redis:
+    container_name: redis
+    image: redis:7.2.5-alpine
+
+  celery:
+    container_name: celery
+    build: .
+    volumes:
+      - .:/app/
+    environment:
+      - "DJANGO_CELERY_BROKER_URL=${DOCKER_COMPOSE_DJANGO_CELERY_BROKER_URL}"
+      - "DJANGO_CELERY_RESULT_BACKEND=${DOCKER_COMPOSE_DJANGO_CELERY_RESULT_BACKEND}"
+    depends_on:
+      - app
+      - rabbitmq
+      - redis
+
 
 # volumes:
 #   postgres_data:

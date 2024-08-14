@@ -162,9 +162,13 @@ REST_FRAMEWORK = {
 
 # JWT config
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.environ.get('JWT_ACCESS_TOKEN_LIFETIME_MINUTES', 30))),
-    "REFRESH_TOKEN_LIFETIME": timedelta(minutes=int(os.environ.get('JWT_REFRESH_TOKEN_LIFETIME_MINUTES', 1440)))
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=int(os.environ.get('JWT_ACCESS_TOKEN_LIFETIME_MINUTES', 30))),
+    'REFRESH_TOKEN_LIFETIME': timedelta(minutes=int(os.environ.get('JWT_REFRESH_TOKEN_LIFETIME_MINUTES', 1440)))
 }
 
-# Config zarinpal
+# Zarinpal config
 ZARINPAL_MERCHANT_ID = os.environ.get('DJANGO_ZARINPAL_MERCHANT_ID')
+
+# Celery config
+CELERY_BROKER_URL = os.environ.get('DJANGO_CELERY_BROKER_URL', 'amqp://guest:guest@rabbitmq:5672/')
+CELERY_RESULT_BACKEND = os.environ.get('DJANGO_CELERY_RESULT_BACKEND', 'redis://redis:6379/0')
