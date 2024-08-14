@@ -53,6 +53,7 @@ services:
 
   celery:
     container_name: celery
+    command: celery --app=config worker -l INFO -Q tasks
     build: .
     volumes:
       - .:/app/
