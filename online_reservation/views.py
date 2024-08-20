@@ -16,7 +16,7 @@ from django.db.models import Min, Count, Q
 
 from django_filters.rest_framework import DjangoFilterBackend
 from functools import cached_property
-from datetime import datetime, timedelta, timezone, date
+from datetime import datetime, timedelta, timezone
 
 from .models import Doctor, DoctorInsurance, DoctorSpecialty, Insurance, Patient, Province, City, Reserve, Comment, Specialty
 from . import serializers

@@ -1,5 +1,30 @@
 
 services:
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:3.12.14-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  redis:
+    container_name: redis
+    image: redis:7.2.5-alpine
+  
+  db:
+    image: postgres:16.3-alpine
+    container_name: db
+    ports:
+      - "5432:5432"
+    # volumes:
+    #   - postgres_data:/var/lib/postgresql/data
+    environment:
+      - "POSTGRES_DB=${DOCKER_COMPOSE_POSTGRES_DB}"
+      - "POSTGRES_USER=${DOCKER_COMPOSE_POSTGRES_USER}"
+      - "POSTGRES_PASSWORD=${DOCKER_COMPOSE_POSTGRES_PASSWORD}"
+      - "POSTGRES_HOST=${DOCKER_COMPOSE_POSTGRES_HOST}"
+      - "POSTGRES_PORT=${DOCKER_COMPOSE_POSTGRES_PORT}"
+
   app:
     image: django_online_reservation
     container_name: app
@@ -22,34 +47,9 @@ services:
       - "JWT_ACCESS_TOKEN_LIFETIME_MINUTES=${DOCKER_COMPOSE_JWT_ACCESS_TOKEN_LIFETIME_MINUTES}"
       - "JWT_REFRESH_TOKEN_LIFETIME_MINUTES=${DOCKER_COMPOSE_JWT_REFRESH_TOKEN_LIFETIME_MINUTES}"
     depends_on:
-      - postgres
+      - db
       - redis
       - rabbitmq
-  
-  postgres:
-    image: postgres:16.3-alpine
-    container_name: postgres
-    ports:
-      - "5432:5432"
-    # volumes:
-    #   - postgres_data:/var/lib/postgresql/data
-    environment:
-      - "POSTGRES_DB=${DOCKER_COMPOSE_POSTGRES_DB}"
-      - "POSTGRES_USER=${DOCKER_COMPOSE_POSTGRES_USER}"
-      - "POSTGRES_PASSWORD=${DOCKER_COMPOSE_POSTGRES_PASSWORD}"
-      - "POSTGRES_HOST=${DOCKER_COMPOSE_POSTGRES_HOST}"
-      - "POSTGRES_PORT=${DOCKER_COMPOSE_POSTGRES_PORT}"
-  
-  rabbitmq:
-    container_name: rabbitmq
-    image: rabbitmq:3.12.14-management-alpine
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-  
-  redis:
-    container_name: redis
-    image: redis:7.2.5-alpine
 
   celery:
     container_name: celery
@@ -60,11 +60,24 @@ services:
     environment:
       - "DJANGO_CELERY_BROKER_URL=${DOCKER_COMPOSE_DJANGO_CELERY_BROKER_URL}"
       - "DJANGO_CELERY_RESULT_BACKEND=${DOCKER_COMPOSE_DJANGO_CELERY_RESULT_BACKEND}"
+      - "POSTGRES_DB=${DOCKER_COMPOSE_POSTGRES_DB}"
+      - "POSTGRES_USER=${DOCKER_COMPOSE_POSTGRES_USER}"
+      - "POSTGRES_PASSWORD=${DOCKER_COMPOSE_POSTGRES_PASSWORD}"
+      - "POSTGRES_HOST=${DOCKER_COMPOSE_POSTGRES_HOST}"
+      - "POSTGRES_PORT=${DOCKER_COMPOSE_POSTGRES_PORT}"
     depends_on:
       - app
-      - rabbitmq
-      - redis
 
+  flower:
+    image: mher/flower
+    container_name: flower
+    ports:
+      - "5555:5555"
+    environment:
+      - "CELERY_BROKER_URL=${DOCKER_COMPOSE_DJANGO_CELERY_BROKER_URL}"
+      - "FLOWER_UNAUTHENTICATED_API=true"
+    depends_on:
+      - celery
 
 # volumes:
 #   postgres_data:

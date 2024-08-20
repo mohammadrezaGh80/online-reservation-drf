@@ -172,3 +172,4 @@ ZARINPAL_MERCHANT_ID = os.environ.get('DJANGO_ZARINPAL_MERCHANT_ID')
 # Celery config
 CELERY_BROKER_URL = os.environ.get('DJANGO_CELERY_BROKER_URL', 'amqp://guest:guest@rabbitmq:5672/')
 CELERY_RESULT_BACKEND = os.environ.get('DJANGO_CELERY_RESULT_BACKEND', 'redis://redis:6379/0')
+CELERY_TIMEZONE = 'Asia/Tehran'
