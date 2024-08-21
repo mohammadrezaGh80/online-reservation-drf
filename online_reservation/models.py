@@ -293,12 +293,20 @@ class Reserve(models.Model):
     zarinpal_authority = models.CharField(max_length=255, blank=True, verbose_name=_('Zarinpal authority'))
     zarinpal_ref_id = models.CharField(max_length=255, blank=True, verbose_name=_('Zarinpal ref_id'))
 
-    def __str__(self):
-        return f'{self.patient}(Doctor: {self.doctor.first_name}): {self.reserve_datetime}' # TODO: if not exist patient, show proper str
+    def clean(self):
+        super().clean()
+        
+        if Reserve.objects.filter(doctor=self.doctor, reserve_datetime=self.reserve_datetime.replace(second=0, microsecond=0)).exists():
+            raise ValidationError(
+                _("A doctor can't have two or more reserves at the same time(%(reserve_datetime)s)." % {'reserve_datetime': self.reserve_datetime.strftime('%Y-%m-%d %H:%M')})
+            )
     
     def save(self, *args, **kwargs):
         self.reserve_datetime = self.reserve_datetime.replace(second=0, microsecond=0)
         return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.patient}(Doctor: {self.doctor.first_name}): {self.reserve_datetime}' # TODO: if not exist patient, show proper str
 
     class Meta:
         verbose_name = _('Reserve')

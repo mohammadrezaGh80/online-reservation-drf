@@ -279,6 +279,11 @@ class ReserveAdmin(admin.ModelAdmin):
     autocomplete_fields = ['patient', 'doctor']
     ordering = ['-reserve_datetime']
 
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return self.readonly_fields + ('reserve_datetime', )
+        return self.readonly_fields
+
     @admin.display(description=_('doctor'), ordering='doctor__id')
     def get_doctor(self, reserve):
         return reserve.doctor.full_name

@@ -587,7 +587,7 @@ class DoctorUpdateSerializer(serializers.ModelSerializer):
         try:
             instance.clean()
         except ValidationError as e:
-            raise serializers.ValidationError({"detail": e.messages})
+            raise serializers.ValidationError({'detail': e.messages})
 
         return super().validate(attrs)
     
@@ -785,26 +785,22 @@ class ReserveDoctorCreateSerializer(serializers.ModelSerializer):
         new_datetime = datetime.now(tz=TEHRAN_TZ) + timedelta(minutes=5)
         rounded_current_datetime = new_datetime.replace(second=0, microsecond=0)
 
-        if rounded_current_datetime >= reserve_datetime:
+        if rounded_current_datetime > reserve_datetime.replace(second=0, microsecond=0):
             raise serializers.ValidationError('The reserve datetime cannot be before %(rounded_current_datetime)s.' % {'rounded_current_datetime': rounded_current_datetime.strftime('%Y-%m-%d %H:%M')})
         return reserve_datetime.replace(second=0, microsecond=0)
     
     def validate(self, attrs):
         doctor = self.context.get('doctor')
-        reserve_datetime = attrs.get('reserve_datetime')
+        attrs['doctor'] = doctor
+        instance = Reserve(**attrs)
 
-        if Reserve.objects.filter(doctor=doctor, reserve_datetime=reserve_datetime).exists():
-            raise serializers.ValidationError(
-                {'detail': _("A doctor can't have two or more reserves at the same time(%(reserve_datetime)s)." % {'reserve_datetime': reserve_datetime.strftime('%Y-%m-%d %H:%M')})}
-            )
+        try:
+            instance.clean()
+        except ValidationError as e:
+            raise serializers.ValidationError({'detail': e.messages})
 
         return super().validate(attrs)
-    
-    def create(self, validated_data):
-        doctor = self.context.get('doctor')
-        validated_data['doctor'] = doctor
-        return super().create(validated_data)
-
+        
 
 class ReservePaymentQueryParamSerializer(serializers.Serializer):
     reserve_id = serializers.IntegerField(error_messages={

@@ -1,11 +1,14 @@
 from django.dispatch import receiver
 from django.db.models.signals import post_save
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 
-from .models import Patient, Doctor, Comment
+from datetime import timezone, timedelta, datetime
+
+from .models import Patient, Doctor, Comment, Reserve
+from .tasks import remove_patient_from_reserve_after_expired
 
 
+TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
 User = get_user_model()
 
 
@@ -25,3 +28,10 @@ def remove_comment_for_change_status_to_not_approved(sender, instance, **kwargs)
 def remove_doctor_for_change_status_to_rejected(sender, instance, **kwargs):
     if instance.status == Doctor.DOCTOR_STATUS_REJECTED:
         instance.delete()
+
+
+@receiver(post_save, sender=Reserve)
+def manage_patient_for_newly_reserve(sender, instance, created, **kwargs):
+    if created and instance.reserve_datetime > datetime.now(tz=TEHRAN_TZ):
+        delay = (instance.reserve_datetime - datetime.now(tz=TEHRAN_TZ)).total_seconds()
+        remove_patient_from_reserve_after_expired.apply_async((instance.id, ), countdown=delay)
