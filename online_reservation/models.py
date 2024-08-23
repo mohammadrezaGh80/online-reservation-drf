@@ -30,7 +30,7 @@ class City(models.Model):
     def clean(self):
         super().clean()
 
-        if City.objects.filter(province=self.province, name=self.name).exists():
+        if City.objects.filter(province=self.province, name=self.name).exclude(id=self.id).exists():
             raise ValidationError(_('There is a city with this name in %(province_name)s.' % {'province_name': self.province.name}))
 
     class Meta:
@@ -288,7 +288,7 @@ class Reserve(models.Model):
     patient = models.ForeignKey(Patient, blank=True, null=True, on_delete=models.PROTECT, related_name='reserves', verbose_name=_('Patient')) # TODO: patient can cancel reserve for 20 minutes
     status = models.CharField(max_length=1, choices=RESERVE_STATUS, default=RESERVE_STATUS_UNPAID, verbose_name=_('Status')) # TODO: after 20 minutes delete patient's reserve
     price = models.PositiveIntegerField(verbose_name=_('Price'))
-    reserve_datetime = models.DateTimeField(unique=True, verbose_name=_('Reserve datetime')) # TODO: in same day and time, doctor can't add more than one reserve && if reserve_datetime has passed delete it reserve
+    reserve_datetime = models.DateTimeField(verbose_name=_('Reserve datetime')) # TODO: in same day and time, doctor can't add more than one reserve && if reserve_datetime has passed delete it reserve
 
     zarinpal_authority = models.CharField(max_length=255, blank=True, verbose_name=_('Zarinpal authority'))
     zarinpal_ref_id = models.CharField(max_length=255, blank=True, verbose_name=_('Zarinpal ref_id'))
@@ -296,7 +296,7 @@ class Reserve(models.Model):
     def clean(self):
         super().clean()
         
-        if Reserve.objects.filter(doctor=self.doctor, reserve_datetime=self.reserve_datetime.replace(second=0, microsecond=0)).exists():
+        if Reserve.objects.filter(doctor=self.doctor, reserve_datetime=self.reserve_datetime.replace(second=0, microsecond=0)).exclude(id=self.id).exists():
             raise ValidationError(
                 _("A doctor can't have two or more reserves at the same time(%(reserve_datetime)s)." % {'reserve_datetime': self.reserve_datetime.strftime('%Y-%m-%d %H:%M')})
             )
