@@ -293,6 +293,9 @@ class Reserve(models.Model):
     zarinpal_authority = models.CharField(max_length=255, blank=True, verbose_name=_('Zarinpal authority'))
     zarinpal_ref_id = models.CharField(max_length=255, blank=True, verbose_name=_('Zarinpal ref_id'))
 
+    celery_task_id = models.CharField(blank=True, max_length=255, verbose_name=_('Celery task_id'))
+    celery_payment_expiration_datetime = models.DateTimeField(blank=True, null=True, verbose_name=_('Celery payment expiration datetime'))
+
     def clean(self):
         super().clean()
         
