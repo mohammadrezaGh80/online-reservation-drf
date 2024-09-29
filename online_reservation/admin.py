@@ -273,7 +273,7 @@ class CommentAdmin(admin.ModelAdmin):
 
 @admin.register(models.Reserve)
 class ReserveAdmin(admin.ModelAdmin):
-    list_display = ['patient', 'get_doctor', 'status', 'price', 'get_reserve_datetime', 'is_expired']
+    list_display = ['patient', 'get_doctor', 'status', 'price', 'get_reserve_datetime', 'celery_task_id', 'celery_payment_expiration_datetime', 'is_expired']
     list_per_page = 15
     list_select_related = ['patient', 'doctor']
     autocomplete_fields = ['patient', 'doctor']
@@ -295,4 +295,4 @@ class ReserveAdmin(admin.ModelAdmin):
     
     @admin.display(description=_('is_expired'))
     def is_expired(self, reserve):
-        return True if reserve.reserve_datetime < datetime.now(tz=timezone.utc) else False
+        return True if reserve.reserve_datetime < datetime.now(tz=TEHRAN_TZ) + timedelta(minutes=5) else False

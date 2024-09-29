@@ -748,7 +748,7 @@ class ReserveDoctorSerializer(serializers.ModelSerializer):
         return None
     
     def get_is_expired(self, reserve):
-        return True if reserve.reserve_datetime < datetime.now(tz=TEHRAN_TZ) else False
+        return True if reserve.reserve_datetime < datetime.now(tz=TEHRAN_TZ) + timedelta(minutes=5) else False
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -782,7 +782,7 @@ class ReserveDoctorCreateSerializer(serializers.ModelSerializer):
         fields = ['id', 'price', 'reserve_datetime']
     
     def validate_reserve_datetime(self, reserve_datetime):
-        new_datetime = datetime.now(tz=TEHRAN_TZ) + timedelta(minutes=5)
+        new_datetime = datetime.now(tz=TEHRAN_TZ) + timedelta(minutes=10)
         rounded_current_datetime = new_datetime.replace(second=0, microsecond=0)
 
         if rounded_current_datetime > reserve_datetime.replace(second=0, microsecond=0):
@@ -817,7 +817,7 @@ class ReservePaymentQueryParamSerializer(serializers.Serializer):
         except Reserve.DoesNotExist:
             raise NotFound({'detail': _("There isn't any reserve with this reserve_id.")})
         else:
-            if reserve.reserve_datetime < datetime.now(tz=TEHRAN_TZ):
+            if reserve.reserve_datetime < datetime.now(tz=TEHRAN_TZ) + timedelta(minutes=5):
                 raise serializers.ValidationError({'detail': _('This reserve has expired.')})
             elif reserve.patient and reserve.patient != patient:
                 raise serializers.ValidationError({'detail': _('This reserve has been taken by another patient.')})
@@ -834,10 +834,11 @@ class ReservePaymentSerializer(serializers.ModelSerializer):
     office_address = serializers.CharField(source='doctor.office_address')
     reserve_date = serializers.DateTimeField(source='reserve_datetime', format='%Y-%m-%d')
     reserve_time = serializers.DateTimeField(source='reserve_datetime', format='%H:%M:%S')
+    payment_expiration_datetime = serializers.DateTimeField(source='celery_payment_expiration_datetime', format='%Y-%m-%d %H:%M:%S')
 
     class Meta:
         model = Reserve
-        fields = ['id', 'doctor', 'specialties', 'reserve_date', 'reserve_time', 'price', 'office_address', 'patient']
+        fields = ['id', 'doctor', 'specialties', 'reserve_date', 'reserve_time', 'price', 'office_address', 'patient', 'payment_expiration_datetime']
     
     def get_specialties(self, reserve):
         serializer = DoctorSpecialtySerializer(reserve.doctor.specialties, many=True)

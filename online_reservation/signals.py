@@ -33,5 +33,5 @@ def remove_doctor_for_change_status_to_rejected(sender, instance, **kwargs):
 @receiver(post_save, sender=Reserve)
 def manage_patient_for_newly_reserve(sender, instance, created, **kwargs):
     if created and instance.reserve_datetime > datetime.now(tz=TEHRAN_TZ):
-        delay = (instance.reserve_datetime - datetime.now(tz=TEHRAN_TZ)).total_seconds()
-        remove_patient_from_reserve_after_expired.apply_async((instance.id, ), countdown=delay)
+        eta = instance.reserve_datetime
+        remove_patient_from_reserve_after_expired.apply_async((instance.id, ), eta=eta)

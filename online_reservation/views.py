@@ -17,6 +17,7 @@ from django.db.models import Min, Count, Q
 from django_filters.rest_framework import DjangoFilterBackend
 from functools import cached_property
 from datetime import datetime, timedelta, timezone
+from celery.result import AsyncResult
 
 from .models import Doctor, DoctorInsurance, DoctorSpecialty, Insurance, Patient, Province, City, Reserve, Comment, Specialty
 from . import serializers
@@ -25,6 +26,7 @@ from .filters import PatientFilter, DoctorFilter, CommentListWaitingFilter, Rese
 from .permissions import IsDoctor, IsPatientInfoComplete, IsDoctorOfficeAddressInfoComplete, IsDoctorOfficeAddressInfoCompleteForAdmin, IsDoctorOrPatient
 from .payment import ZarinpalSandbox
 from .ordering import DoctorOrderingFilter
+from .tasks import manage_patient_after_end_of_reserve_purchase_time
 
 
 TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
@@ -269,7 +271,7 @@ class AppointmentDoctorGenericAPIView(generics.GenericAPIView):
 
     def get_queryset(self):
         doctor = self.doctor
-        return doctor.reserves.select_related('patient').filter(reserve_datetime__gte=datetime.now(tz=TEHRAN_TZ)).order_by('-reserve_datetime')
+        return doctor.reserves.select_related('patient').filter(reserve_datetime__gte=datetime.now(tz=TEHRAN_TZ) + timedelta(minutes=5)).order_by('-reserve_datetime')
 
     def get(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -404,8 +406,25 @@ class PaymentProcessSandboxGenericAPIView(generics.GenericAPIView):
         reserve = self.get_queryset().get(pk=reserve_id)
 
         if not reserve.patient:
-            reserve.patient = request.user.patient
-            reserve.save(update_fields=['patient'])
+            patient = request.user.patient
+            reserve_queryset = Reserve.objects.filter(patient=patient, reserve_datetime__gte=datetime.now(tz=TEHRAN_TZ) + timedelta(minutes=5)).exclude(id=reserve.id)
+
+            if reserve_queryset.exists():
+                previous_reserve = reserve_queryset.first()
+                result_task = AsyncResult(previous_reserve.celery_task_id)
+                result_task.revoke()
+                previous_reserve.patient = None
+                previous_reserve.celery_task_id = ''
+                previous_reserve.celery_payment_expiration_datetime = None
+                previous_reserve.save(update_fields=['patient', 'celery_task_id', 'celery_payment_expiration_datetime'])
+            
+            reserve.patient = patient
+            eta = min(reserve.reserve_datetime - timedelta(minutes=5), datetime.now(tz=TEHRAN_TZ) + timedelta(minutes=20))
+            task = manage_patient_after_end_of_reserve_purchase_time.apply_async((reserve.id, ), eta=eta)
+            reserve.celery_task_id = task.id
+            reserve.celery_payment_expiration_datetime = eta
+
+            reserve.save(update_fields=['patient', 'celery_task_id', 'celery_payment_expiration_datetime'])
 
         serializer = serializers.ReservePaymentSerializer(reserve)
         return Response(serializer.data, status=status_code.HTTP_200_OK)
@@ -418,8 +437,26 @@ class PaymentProcessSandboxGenericAPIView(generics.GenericAPIView):
         reserve = self.get_queryset().get(pk=reserve_id)
 
         if not reserve.patient:
-            reserve.patient = request.user.patient
-            reserve.save(update_fields=['patient'])
+            patient = request.user.patient
+            reserve_queryset = Reserve.objects.filter(patient=patient, reserve_datetime__gte=datetime.now(tz=TEHRAN_TZ) + timedelta(minutes=5)).exclude(id=reserve.id)
+
+            if reserve_queryset.exists():
+                previous_reserve = reserve_queryset.first()
+                result_task = AsyncResult(previous_reserve.celery_task_id)
+                result_task.revoke()
+                previous_reserve.patient = None
+                previous_reserve.celery_task_id = ''
+                previous_reserve.celery_payment_expiration_datetime = None
+                previous_reserve.save(update_fields=['patient', 'celery_task_id', 'celery_payment_expiration_datetime'])
+
+            reserve.patient = patient
+            eta = min(reserve.reserve_datetime - timedelta(minutes=5), datetime.now(tz=TEHRAN_TZ) + timedelta(minutes=20))
+            task = manage_patient_after_end_of_reserve_purchase_time.apply_async((reserve.id, ), eta=eta)
+
+            reserve.celery_task_id = task.id
+            reserve.celery_payment_expiration_datetime = eta
+
+            reserve.save(update_fields=['patient', 'celery_task_id', 'celery_payment_expiration_datetime'])
         
         zarinpal_sandbox = ZarinpalSandbox(settings.ZARINPAL_MERCHANT_ID)
         data = zarinpal_sandbox.payment_request(
