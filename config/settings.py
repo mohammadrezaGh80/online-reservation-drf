@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'django_filters',
+    'django_celery_beat',
 
     # My apps
     'core',
@@ -172,4 +173,5 @@ ZARINPAL_MERCHANT_ID = os.environ.get('DJANGO_ZARINPAL_MERCHANT_ID')
 # Celery config
 CELERY_BROKER_URL = os.environ.get('DJANGO_CELERY_BROKER_URL', 'amqp://guest:guest@rabbitmq:5672/')
 CELERY_RESULT_BACKEND = os.environ.get('DJANGO_CELERY_RESULT_BACKEND', 'redis://redis:6379/0')
+CELERY_ENABLE_UTC = False
 CELERY_TIMEZONE = 'Asia/Tehran'

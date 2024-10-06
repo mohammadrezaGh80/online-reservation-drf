@@ -67,6 +67,23 @@ services:
       - "POSTGRES_PORT=${DOCKER_COMPOSE_POSTGRES_PORT}"
     depends_on:
       - app
+  
+  celery-beat:
+    container_name: celery-beat
+    command: celery --app=config beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    build: .
+    volumes:
+      - .:/app/
+    environment:
+      - "DJANGO_CELERY_BROKER_URL=${DOCKER_COMPOSE_DJANGO_CELERY_BROKER_URL}"
+      - "DJANGO_CELERY_RESULT_BACKEND=${DOCKER_COMPOSE_DJANGO_CELERY_RESULT_BACKEND}"
+      - "POSTGRES_DB=${DOCKER_COMPOSE_POSTGRES_DB}"
+      - "POSTGRES_USER=${DOCKER_COMPOSE_POSTGRES_USER}"
+      - "POSTGRES_PASSWORD=${DOCKER_COMPOSE_POSTGRES_PASSWORD}"
+      - "POSTGRES_HOST=${DOCKER_COMPOSE_POSTGRES_HOST}"
+      - "POSTGRES_PORT=${DOCKER_COMPOSE_POSTGRES_PORT}"
+    depends_on:
+      - app
 
   flower:
     image: mher/flower
@@ -78,6 +95,7 @@ services:
       - "FLOWER_UNAUTHENTICATED_API=true"
     depends_on:
       - celery
+      - celery-beat
 
 # volumes:
 #   postgres_data:
